@@ -1,9 +1,6 @@
 # $FreeBSD$
 
 PORTNAME=	pfSense-pkg-BindDump
-<<<<<<< HEAD
-PORTVERSION=	1.0.14
-=======
 PORTVERSION=	1.0.15
 PORTREVISION=	1
 CATEGORIES=	sysutils
@@ -31,7 +28,7 @@ do-install:
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/packages/binddump
 	${MKDIR} ${STAGEDIR}${DATADIR}
 
-
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/binddump.xml ${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/binddump.xml ${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/binddump.inc ${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${FILESDIR}/etc/inc/priv/binddump.priv.inc ${STAGEDIR}/etc/inc/priv
