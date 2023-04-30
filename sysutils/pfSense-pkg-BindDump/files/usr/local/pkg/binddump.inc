@@ -558,4 +558,27 @@ function binddump_waitfor_string_in_file($filename, $string, $timeout)
 	}
 	throw new Exception('Timeout while waiting for end of file');
 }
+
+function binddump_get_zonelist(){
+	global $config;
+
+	if (is_array($config['installedpackages']['bindzone'])) {
+		$bindzone = $config['installedpackages']['bindzone']['config'];
+	} else {
+		$bindzone = array();
+	}
+	return $bindzone;
+}
+
+function binddump_reverse_zonename($zone) {
+	if ($zone['reverso'] == "on") {
+		if ($zone['reversv6o'] == "on") {
+			return $zone['name'] . ".ip6.arpa";
+		} else {
+			return $zone['name'] . ".in-addr.arpa";
+		}
+	} else {
+		return $zone['name'];
+	}
+}
 ?>
