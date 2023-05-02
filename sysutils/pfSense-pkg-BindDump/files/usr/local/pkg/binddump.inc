@@ -45,9 +45,9 @@ function binddump_get_rndc_zone_dump_parsed()
 
 	$output = null;
 	$retval = null;
-	exec("{$rndc} dumpdb -zones", $output, $retval);
+	exec("{$rndc} dumpdb -zones". ' 2>&1', $output, $retval);
 	if ($retval !== 0) {
-		throw new Exception('Exception during zone compiling. Code:' . $retval . " \n Message: " . $output);
+		throw new Exception('Exception during zone compiling. Code:' . $retval . "\n" . implode("\n", $output));
 	}
 	$dumpFile = CHROOT_LOCALBASE . '/etc/namedb/named_dump.db';
 
@@ -72,9 +72,9 @@ function binddump_compilezone($view, $zone)
 	$tmpfname = tempnam("/tmp", "zoneConvert");
 	$output = null;
 	$retval = null;
-	exec("/usr/local/sbin/named-compilezone -F text -q -i none -s full -o " . escapeshellarg($tmpfname) . " " . escapeshellarg($zone) . " " . escapeshellarg($zoneFile), $output, $retval);
+	exec("/usr/local/sbin/named-compilezone -F text -q -i none -s full -o " . escapeshellarg($tmpfname) . " " . escapeshellarg($zone) . " " . escapeshellarg($zoneFile) . ' 2>&1', $output, $retval);
 	if ($retval !== 0) {
-		throw new Exception('Exception during zone compiling. Code:' . $retval . " \n Message: " . $output);
+		throw new Exception('Exception during zone compiling. Code:' . $retval . " \n" . implode("\n", $output));
 	}
 
 	$result = file_get_contents($tmpfname);
@@ -564,6 +564,8 @@ function binddump_get_zonelist(){
 
 	if (is_array($config['installedpackages']['bindzone'])) {
 		$bindzone = $config['installedpackages']['bindzone']['config'];
+		$col = array_column($bindzone, 'name');
+		array_multisort($col, SORT_ASC, $bindzone);
 	} else {
 		$bindzone = array();
 	}

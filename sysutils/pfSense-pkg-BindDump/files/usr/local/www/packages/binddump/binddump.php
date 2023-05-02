@@ -182,6 +182,7 @@ include("head.inc");
 if ($input_errors) {
     print_input_errors($input_errors);
 }
+$zonelist = binddump_get_zonelist();
 
 $tab_array = array();
 $tab_array[] = array(gettext("Database"), true, "/packages/binddump/binddump.php");
@@ -189,139 +190,143 @@ $tab_array[] = array(gettext("Edit RAW Zone File"), false, "/packages/binddump/z
 display_top_tabs($tab_array);
 ?>
 
-<div class="panel panel-default" id="search-panel">
-    <div class="panel-heading">
-        <h2 class="panel-title">
-            <?= gettext('Search') ?>
-            <span class="widget-heading-icon pull-right">
-                <a data-toggle="collapse" href="#search-panel_panel-body">
-                    <i class="fa fa-plus-circle"></i>
-                </a>
-            </span>
-        </h2>
-    </div>
-    <div id="search-panel_panel-body" class="panel-body collapse in">
-        <div class="form-group">
-            <label class="col-sm-2 control-label">
-                <?= gettext("Search term") ?>
-            </label>
-            <div class="col-sm-5"><input class="form-control" name="searchstr" id="searchstr" type="text" /></div>
-            <div class="col-sm-2">
-                <select id="where" class="form-control">
-                    <option value="1">
-                        <?= gettext("Zone") ?>
-                    </option>
-                    <option value="2">
-                        <?= gettext("Name") ?>
-                    </option>
-                    <option value="3">
-                        <?= gettext("RData") ?>
-                    </option>
-                    <option value="0" selected>
-                        <?= gettext("All") ?>
-                    </option>
-                </select>
-            </div>
-            <div class="col-sm-4">
-                <a id="btnsearch" title="<?= gettext("Search") ?>" class="btn btn-primary btn-sm"><i
-                        class="fa fa-search icon-embed-btn"></i>
-                    <?= gettext("Search") ?>
-                </a>
-                <a id="btnclear" title="<?= gettext("Clear") ?>" class="btn btn-info btn-sm"><i
-                        class="fa fa-undo icon-embed-btn"></i>
-                    <?= gettext("Clear") ?>
-                </a>
-                <a id="btnreload" title="<?= gettext("Reload") ?>" class="btn btn-info btn-sm"><i
-                        class="fa fa-undo icon-embed-btn"></i>
-                    <?= gettext("Reload") ?>
-                </a>
-            </div>
-            <div class="col-sm-10 col-sm-offset-2">
-                <span class="help-block">
-                    <?= gettext('Enter a search string or *nix regular expression to filter entries.') ?>
+<form class="form-horizontal" method="post" action="binddump.php" enctype="multipart/form-data">
+    <div class="panel panel-default" id="search-panel">
+        <div class="panel-heading">
+            <h2 class="panel-title">
+                <?= gettext('Search') ?>
+                <span class="widget-heading-icon pull-right">
+                    <a data-toggle="collapse" href="#search-panel_panel-body">
+                        <i class="fa fa-plus-circle"></i>
+                    </a>
                 </span>
-            </div>
+            </h2>
         </div>
-        <div class="form-group">
-            <label class="col-sm-2 control-label">
-                <?= gettext("Zone") ?>
-            </label>
-            <div class="col-sm-4">
-                <select id="zoneselect" class="form-control">
-                    <option value="all" selected>
-                        <?= gettext("All Zones") ?>
-                    </option>
-                    <?php foreach (binddump_get_zonelist() as $zone): ?>
-                        <option value="<?= htmlspecialchars(binddump_reverse_zonename($zone) . '.') ?>"><?= $zone['type'] . ': ' . htmlspecialchars(binddump_reverse_zonename($zone) . '.') ?></option>
-                    <?php endforeach; ?>
-                </select>
+        <div id="search-panel_panel-body" class="panel-body collapse in">
+            <div class="form-group">
+                <label class="col-sm-2 control-label">
+                    <?= gettext("Search term") ?>
+                </label>
+                <div class="col-sm-8"><input class="form-control" name="searchstr" id="searchstr" type="text" /></div>
+                <div class="col-sm-2">
+                    <select id="where" class="form-control">
+                        <option value="1">
+                            <?= gettext("Zone") ?>
+                        </option>
+                        <option value="2">
+                            <?= gettext("Name") ?>
+                        </option>
+                        <option value="3">
+                            <?= gettext("RData") ?>
+                        </option>
+                        <option value="0" selected>
+                            <?= gettext("All") ?>
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-sm-4 col-sm-offset-2">
+                    <a id="btnsearch" title="<?= gettext("Search") ?>" class="btn btn-primary btn-sm"><i
+                            class="fa fa-search icon-embed-btn"></i>
+                        <?= gettext("Search") ?>
+                    </a>
+                    <a id="btnclear" title="<?= gettext("Clear") ?>" class="btn btn-info btn-sm"><i
+                            class="fa fa-undo icon-embed-btn"></i>
+                        <?= gettext("Clear") ?>
+                    </a>
+                </div>
+                <div class="col-sm-10 col-sm-offset-2">
+                    <span class="help-block">
+                        <?= gettext('Enter a search string or *nix regular expression to filter entries.') ?>
+                    </span>
+                </div>
             </div>
-        </div>
-        <div class="form-group">
-            <label class="col-sm-2 control-label">
-                <?= gettext("Type") ?>
-            </label>
-            <div class="col-sm-2">
-                <select id="typeselect" class="form-control">
-                    <option value="all" selected>
-                        <?= gettext("All Types") ?>
-                    </option>
-                    <?php foreach ($types as $type): ?>
-                        <option value="<?= htmlspecialchars($type) ?>"><?= htmlspecialchars($type) ?></option>
-                    <?php endforeach; ?>
-                </select>
+            <div class="form-group">
+                <label class="col-sm-2 control-label">
+                    <?= gettext("Zone") ?>
+                </label>
+                <div class="col-sm-4">
+                    <select id="zoneselect" class="form-control">
+                        <option value="all" selected>
+                            <?= gettext("All Zones") ?>
+                        </option>
+                        <?php foreach ($zonelist as $zone): ?>
+                            <option value="<?= htmlspecialchars(binddump_reverse_zonename($zone) . '.') ?>">
+                                <?= htmlspecialchars(binddump_reverse_zonename($zone) . '. (' . $zone['type'] . ')') ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="col-sm-2 control-label">
+                    <?= gettext("Type") ?>
+                </label>
+                <div class="col-sm-2">
+                    <select id="typeselect" class="form-control">
+                        <option value="all" selected>
+                            <?= gettext("All Types") ?>
+                        </option>
+                        <?php foreach ($types as $type): ?>
+                            <option value="<?= htmlspecialchars($type) ?>"><?= htmlspecialchars($type) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="panel panel-default">
-    <div class="panel-heading">
-        <h2 class="panel-title">
-            <?= gettext('Database') ?>
-        </h2>
-    </div>
-    <div class="panel-body">
-        <div class="form-group">
-            <div class="col-sm-5">
-                <a id="btndownloadFullZone" title="<?= gettext("Download Full Zone Dump") ?>"
-                    class="btn btn-info btn-sm"><i class="fa fa-download icon-embed-btn"></i>
-                    <?= gettext("Full Zone Dump") ?>
-                </a>
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h2 class="panel-title">
+                <?= gettext('Database') ?>
+            </h2>
+        </div>
+        <div class="panel-body">
+            <div class="form-group">
+                <div class="col-sm-3">
+                    <a id="btndownloadFullZone" title="<?= gettext("Download Full Zone Dump") ?>"
+                        class="btn btn-info btn-sm">
+                        <i class="fa fa-download icon-embed-btn"></i>
+                        <?= gettext("Full Zone Dump") ?>
+                    </a>
+                    <a id="btnreload" title="<?= gettext("Reload") ?>" class="btn btn-info btn-sm">
+                        <i class="fa fa-undo icon-embed-btn"></i>
+                        <?= gettext("Reload") ?>
+                    </a>
+                </div>
             </div>
         </div>
+
+        <div class="panel-body table-responsive">
+            <table class="table table-striped table-hover table-condensed sortable-theme-bootstrap" data-sortable>
+                <thead>
+                    <tr>
+                        <th>
+                            <?= gettext("Name") ?>
+                        </th>
+                        <th>
+                            <?= gettext("Type") ?>
+                        </th>
+                        <th>
+                            <?= gettext("Data") ?>
+                        </th>
+                        <th data-sortable="false">
+                            <?= gettext("Actions") ?>
+                        </th>
+                    </tr>
+                </thead>
+                <tbody id="leaselist">
+                    <tr>
+                        <td colspan=5>
+                            <?= htmlspecialchars(gettext('Loading...')) ?>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
     </div>
-
-    <div class="panel-body table-responsive">
-        <table class="table table-striped table-hover table-condensed sortable-theme-bootstrap" data-sortable>
-            <thead>
-                <tr>
-                    <th>
-                        <?= gettext("Name") ?>
-                    </th>
-                    <th>
-                        <?= gettext("Type") ?>
-                    </th>
-                    <th>
-                        <?= gettext("Data") ?>
-                    </th>
-                    <th data-sortable="false">
-                        <?= gettext("Actions") ?>
-                    </th>
-                </tr>
-            </thead>
-            <tbody id="leaselist">
-                <tr>
-                    <td colspan=5>
-                        <?= htmlspecialchars(gettext('Loading...')) ?>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
-</div>
-
-
+</form>
 <?php
 
 $form = new Form(false);
@@ -351,6 +356,6 @@ print $form;
 include('foot.inc');
 
 print '<script type="text/javascript">';
-print (file_get_contents('binddump.js', true));
+print(file_get_contents('binddump.js', true));
 print '</script>';
 ?>

@@ -11,34 +11,19 @@ define('CHROOT_LOCALBASE', '/var/etc/named');
 $rndc_conf_path = BIND_LOCALBASE . "/etc/rndc.conf";
 $rndc = "/usr/local/sbin/rndc -q -c {$rndc_conf_path}";
 
+
 if ($_POST) {
     $input_errors = array();
     $post = $_POST;
-
-    if (!empty($_POST["thawall"])) {
-        exec("{$rndc} thaw" . ' 2>&1', $output, $resultCode);
-        if ($resultCode !== 0) {
-            $input_errors[] = "RNDC THAW throwed an exception. Code {$resultCode} \n " . implode("\n", $output);
-        } else {
-            $post['zone_editable'] = "false";
-            $savemsg = "Thaw successfull.\n\n" . implode("\n", $output);
-        }
-    }
 
     if ($_POST['zoneselect'] !== $post['current_zone'] || !empty($_POST["reload"])) {
         if ($_POST['zone_editable'] == "true") {
             $input_errors[] = "Zone is in Edit-Mode. End Edit-Mode before switching to another Zone.";
             $post['zoneselect'] = $post['current_zone'];
         } else {
-            try {
-                $selectedZone = explode('__', htmlspecialchars_decode($_POST['zoneselect']));
-                $post['zone_data'] = binddump_compilezone($selectedZone[0], $selectedZone[1]);
-            } catch (Exception $e) {
-                $post['zone_data'] = '';
-                $input_errors[] = 'Exception: ' . $e->getMessage();
-            }
+            $loadZone = true;
             $post['zone_editable'] = "false";
-            $post['current_zone'] = $_POST['zoneselect'];
+            $post['current_zone'] = $post['zoneselect'];
         }
     }
 
@@ -47,6 +32,27 @@ if ($_POST) {
     $zonename = $selectedZone[1];
     $zonename_reverse = $selectedZone[2];
     $zonetype = $selectedZone[3];
+
+    if ($loadZone){
+        try {
+            $post['zone_data'] = binddump_compilezone($zoneview, $zonename);
+        } catch (Exception $e) {
+            $post['zone_data'] = '[error]';
+            $input_errors[] = $e->getMessage();
+            unset($_POST["save"]);
+            $post['zone_editable'] = "false";
+        }
+    }
+
+    if (!empty($_POST["thawall"])) {
+        exec("{$rndc} thaw" . ' 2>&1', $output, $resultCode);
+        if ($resultCode !== 0) {
+            $input_errors[] = "RNDC THAW throwed an exception. Code {$resultCode} \n " . implode("\n", $output);
+        } else {
+            $post['zone_editable'] = "false";
+            $savemsg = "Thaw successfull.\n" . implode("\n", $output);
+        }
+    }
 
     if (!empty($_POST["save"])) {
         $tempDB = tempnam("/tmp", "validate_zone");
@@ -79,17 +85,22 @@ if ($_POST) {
         }
     }
 
-
-
     if (!empty($_POST["freeze"])) {
         exec("{$rndc} freeze " . escapeshellarg($zonename_reverse) . " IN " . escapeshellarg($zoneview) . ' 2>&1', $output, $resultCode);
 
         if ($resultCode !== 0) {
             $input_errors[] = "named-checkzone throwed an exception. Code {$resultCode} \n " . implode("\n", $output);
         } else {
-            $post['zone_editable'] = "true";
-            $post['zone_data'] = binddump_compilezone($zoneview, $zonename);
-            $savemsg = implode("\n", $output) . "\n\n Zone frozen and file reloaded.\n Don't forget to thaw zone before leaving.";
+            try{
+                $post['zone_data'] = binddump_compilezone($zoneview, $zonename);
+                $post['zone_editable'] = "true";
+            } catch (Exception $e) {
+                $post['zone_data'] = '[error]';
+                $input_errors[] = $e->getMessage();
+                $post['zone_editable'] = "false";
+            }
+            
+            $savemsg = implode("\n", $output) . "\n\n Zone frozen and file reloaded.\n Don't forget to END EDIT before leaving.";
         }
     }
 }
@@ -106,7 +117,9 @@ display_top_tabs($tab_array);
 
 $zonelist = [];
 foreach (binddump_get_zonelist() as $zone) {
-    $zonelist[$zone['view'] . '__' . $zone['name'] . '__' . binddump_reverse_zonename($zone) . '__' . $zone['type']] = binddump_reverse_zonename($zone) . '  (' . $zone['view'] . ')' ;
+    if($zone['type'] == 'master'){
+        $zonelist[$zone['view'] . '__' . $zone['name'] . '__' . binddump_reverse_zonename($zone) . '__' . $zone['type']] = binddump_reverse_zonename($zone) . '  (' . $zone['view'] . ')' ;
+    }
 }
 ksort($zonelist);
 
@@ -120,14 +133,14 @@ if ($savemsg) {
 
 ?>
 
-<form method="post" action="zoneEdit.php" enctype="multipart/form-data">
+<form class="form-horizontal" method="post" action="zoneEdit.php" enctype="multipart/form-data">
     <div class="panel panel-default">
         <div class="panel-heading">
             <h2 class="panel-title"><?=gettext('Zone')?></h2>
         </div>
         <div class="panel-body">
             <div class="form-group">
-                <label for="zoneselect" class="col-sm-2 control-label" onchange="this.form.submit();">
+                <label for="zoneselect" class="col-sm-2 control-label">
                     <span><?=gettext('Zone')?></span>
                 </label>
                 <div class="col-sm-10">
@@ -137,7 +150,7 @@ if ($savemsg) {
                             <option <? if ($key == $post['current_zone']){print('selected');} ?> value="<?=$key?>"><?=$value?></option>
                         <? } ?>
                     </select>
-                </div>
+                        </div>
             </div>
             <div class="form-group">
                 <label for="load" class="col-sm-2 control-label">
@@ -165,9 +178,7 @@ if ($savemsg) {
             <h2 class="panel-title"><?=gettext('Edit Zone')?></h2>
         </div>
         <div class="panel-body">
-            <textarea rows="25" class="form-control" name="zone_data" id="zone_data" wrap="off" <? if ($post['zone_editable'] !== 'true') {print('readonly="readonly"'); } ?> >
-            <?= $post['zone_data'] ?>
-        </textarea>
+            <textarea rows="25" class="col-sm-12 form-control" name="zone_data" id="zone_data" wrap="off" <? if ($post['zone_editable'] !== 'true') {print('readonly="readonly"'); } ?> ><?= $post['zone_data'] ?></textarea>
         </div>
     </div>
 
@@ -242,79 +253,17 @@ if ($savemsg) {
 </form>
 
 <?
-$form = new Form();
-$form->setMultipartEncoding();
+// $form = new Form();
+// $form->setMultipartEncoding();
 
-/* #region section ZONE */
-$section = new Form_Section('Zone');
+// /* #region section ZONE */
+// $section = new Form_Section('Zone');
 
-$zoneselect = new Form_Select('zoneselect', 'Zone', $post['zoneselect'], $zonelist, false);
-$zoneselect->setOnchange("this.form.submit();");
-$section->addInput($zoneselect);
+// $zoneselect = new Form_Select('zoneselect', 'Zone', $post['zoneselect'], $zonelist, false);
+// $zoneselect->setOnchange("this.form.submit();");
+// $section->addInput($zoneselect);
 
-// $group = new Form_Group('Action');
-
-// $btnreload = new Form_Button('load', 'Reload Zone');
-// $group->add($btnreload);
-
-// $btnfreeze = new Form_Button('freeze', 'Start Edit');
-// $btnfreeze->setHelp('While in Edit-Mode, DDNS Updates are disabled.');
-// $group->add($btnfreeze);
-
-// $btnthaw = new Form_Button('thaw', 'End Edit');
-// $group->add($btnthaw);
-
-// $btnthawall = new Form_Button('thawall', 'End Edit - ALL ZONES');
-// $group->add($btnthawall);
-
-// $section->add($group);
-// $form->add($section);
-// /* #endregion */
-
-// /* #region section Edit Zone */
-// $section = new Form_Section('Edit Zone');
-// $zonetext = new Form_Textarea(
-//     'zone_data',
-//     'Zone File',
-//     $post['zone_data']
-// );
-// $zonetext->setWidth(8);
-// $zonetext->setAttribute("rows", "25");
-// $zonetext->setAttribute("wrap", "off");
-// if ($post['zone_editable'] !== "true") {
-//     $zonetext->setReadonly();
-// }
-// $section->addInput($zonetext);
-
-// $form->add($section);
-// /* #endregion */
-
-// $form->addGlobal(new Form_Input('current_zone', null, 'hidden', $post['current_zone']));
-// $form->addGlobal(new Form_Input('zone_editable', null, 'hidden', $post['zone_editable']));
-
-// /* #region Create a Modal Dialog */
-// $modal = new Modal('Aktion', 'dlg_updatestatus', 'large', 'Close');
-// $modal->addInput(
-//     new Form_Textarea(
-//         'dlg_updatestatus_text',
-//         '',
-//         '...Loading...'
-//     )
-// )->removeClass('form-control')->addClass('row-fluid col-sm-10')->setAttribute('rows', '10')->setAttribute('wrap', 'off');
-// $form->add($modal);
-
-// $modal = new Modal(gettext('Please wait'), 'dlg_wait', false, 'Close');
-// $modal->addInput(
-//     new Form_StaticText(
-//         'dlg_wait_text',
-//         'Please wait for the process to complete.<br/><br/>This dialog will auto-close when the update is finished.<br/><br/>' .
-//         '<i class="content fa fa-spinner fa-pulse fa-lg text-center text-info"></i>'
-//     )
-// );
-// $form->add($modal);
-// /* #endregion */
-
-print $form;
+// print $form;
 
 ?>
 <script type="text/javascript">
