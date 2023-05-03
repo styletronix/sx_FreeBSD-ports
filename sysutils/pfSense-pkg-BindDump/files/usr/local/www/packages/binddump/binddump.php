@@ -89,16 +89,21 @@ if ($_REQUEST['download']) {
             $output = null;
             $retval = null;
 
-            exec("{$rndc} dumpdb -zones", $output, $retval);
-            if ($retval !== 0) {
-                die('Exception during zone compiling. Code:' . $retval . " \n Message: " . $output);
-            }
-            $file = CHROOT_LOCALBASE . '/etc/namedb/named_dump.db';
+            $lock = lock("named_dump");
+            try {
+                exec("{$rndc} dumpdb -zones", $output, $retval);
+                if ($retval !== 0) {
+                    die('Exception during zone compiling. Code:' . $retval . " \n Message: " . $output);
+                }
+                $file = CHROOT_LOCALBASE . '/etc/namedb/named_dump.db';
 
-            if (!binddump_waitfor_string_in_file($file, "; Dump complete", 30)) {
-                die('Timeout during zone dump');
+                if (!binddump_waitfor_string_in_file($file, "; Dump complete", 30)) {
+                    die('Timeout during zone dump');
+                }
+                break;
+            } finally {
+                unlock($lock);
             }
-            break;
 
         default:
             die('Invalid Request');
@@ -129,7 +134,7 @@ if ($_REQUEST['action'] == "delete_host") {
     }
 
     try {
-        $result = binddump_addremove_items_to_zone($item['zone'], $item['view'], [], [$item]);
+        $result = binddump_addremove_items_to_zone($item['zonename'], $item['view'], [], [$item]);
     } catch (Exception $e) {
         print("[Exception] ");
         print($e->getMessage());

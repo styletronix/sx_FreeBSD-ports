@@ -35,9 +35,11 @@ if ($_POST) {
 
     if ($loadZone){
         try {
-            $post['zone_data'] = binddump_compilezone($zoneview, $zonename);
+            $post['zone_data'] = binddump_compilezone($zoneview, $zonename_reverse);
         } catch (Exception $e) {
-            $post['zone_data'] = '[error]';
+
+	        $zrev = binddump_re_reverse_zonename($zonename_reverse);
+            $post['zone_data'] = $zrev; //'[error]';
             $input_errors[] = $e->getMessage();
             unset($_POST["save"]);
             $post['zone_editable'] = "false";
@@ -92,7 +94,7 @@ if ($_POST) {
             $input_errors[] = "named-checkzone throwed an exception. Code {$resultCode} \n " . implode("\n", $output);
         } else {
             try{
-                $post['zone_data'] = binddump_compilezone($zoneview, $zonename);
+                $post['zone_data'] = binddump_compilezone($zoneview, $zonename_reverse);
                 $post['zone_editable'] = "true";
             } catch (Exception $e) {
                 $post['zone_data'] = '[error]';

@@ -45,25 +45,31 @@ function binddump_get_rndc_zone_dump_parsed()
 
 	$output = null;
 	$retval = null;
-	exec("{$rndc} dumpdb -zones". ' 2>&1', $output, $retval);
-	if ($retval !== 0) {
-		throw new Exception('Exception during zone compiling. Code:' . $retval . "\n" . implode("\n", $output));
-	}
-	$dumpFile = CHROOT_LOCALBASE . '/etc/namedb/named_dump.db';
 
-	if (binddump_waitfor_string_in_file($dumpFile, "; Dump complete", 30)) {
-		$result = binddump_parse_rndc_zone_dump(file_get_contents($dumpFile));
-		return $result;
-	}
+	$lock = lock("named_dump");
+		try {
+			exec("{$rndc} dumpdb -zones" . ' 2>&1', $output, $retval);
+			if ($retval !== 0) {
+				throw new Exception('Exception during zone compiling. Code:' . $retval . "\n" . implode("\n", $output));
+			}
+			$dumpFile = CHROOT_LOCALBASE . '/etc/namedb/named_dump.db';
 
+			if (binddump_waitfor_string_in_file($dumpFile, "; Dump complete", 30)) {
+				$result = binddump_parse_rndc_zone_dump(file_get_contents($dumpFile));
+				return $result;
+			}
+		} finally {
+			unlock($lock);
+		}
 	return false;
 }
 
-function binddump_compilezone($view, $zone)
+function binddump_compilezone($view, $zone, $type = 'master')
 {
-	$zoneFile = CHROOT_LOCALBASE . "/etc/namedb/master/{$view}/{$zone}.DB";
+	$revname = binddump_re_reverse_zonename($zone);
+	$zoneFile = CHROOT_LOCALBASE . "/etc/namedb/{$type}/{$view}/{$revname}.DB";
 	if (!file_exists($zoneFile)) {
-		$zoneFile = CHROOT_LOCALBASE . "/etc/namedb/slave/{$view}/{$zone}.DB";
+		$zoneFile = CHROOT_LOCALBASE . "/etc/namedb/slave/{$view}/{$revname}.DB";
 		if (!file_exists($zoneFile)) {
 			throw new Exception('Zone file not found: ' . $zoneFile);
 		}
@@ -83,30 +89,31 @@ function binddump_compilezone($view, $zone)
 	return $result;
 }
 
-function binddump_addremove_items_to_zone($zone, $view, $items_add, $items_remove)
+function binddump_addremove_items_to_zone($zone, $view, $items_add, $items_remove, $type = 'master')
 {
 	$rndc_conf_path = BIND_LOCALBASE . "/etc/rndc.conf";
 	$rndc = "/usr/local/sbin/rndc -q -c " . $rndc_conf_path;
 
-	if (str_ends_with($view, ' (signed)' )){
+	if (str_ends_with($view, ' (signed)')) {
 		// Signed DB and unsigned DB will automatically sync when serial is increased
 		$view = substr($view, 0, -9);
 	}
-	$zone_file = CHROOT_LOCALBASE . "/etc/namedb/master/{$view}/{$zone}.DB";
+	$revname = binddump_re_reverse_zonename($zone);
+	$zone_file = CHROOT_LOCALBASE . "/etc/namedb/{$type}/{$view}/{$revname}.DB";
 	$changed = false;
 
 	exec("{$rndc} freeze " . escapeshellarg($zone) . " IN " . escapeshellarg($view));
 
-	try{
+	try {
 		$zoneData = binddump_parse_rndc_zone_dump(binddump_compilezone($view, $zone));
 		$zoneDataNew = [];
-	
+
 		foreach ($zoneData as $record) {
 			if ($record['type'] == 'SOA') {
 				$serial = (int) ($record['serial'] ?: 0);
 				$record['serial'] = $serial + 1;
 			}
-	
+
 			foreach ($items_remove as $item) {
 				if (
 					$record['name'] == $item['name'] &&
@@ -121,19 +128,19 @@ function binddump_addremove_items_to_zone($zone, $view, $items_add, $items_remov
 
 			array_push($zoneDataNew, binddump_zone_record_to_string($record));
 		}
-	
+
 		foreach ($items_add as $item) {
 			array_push($zoneDataNew, binddump_zone_record_to_string($item));
 			$changed = true;
 		}
-	
+
 		if ($changed) {
 			file_put_contents($zone_file, implode("\n", $zoneDataNew) . "\n");
 		}
-	}catch(Exception $e){
+	} catch (Exception $e) {
 		throw $e;
 
-	}finally{
+	} finally {
 		exec("{$rndc} thaw " . escapeshellarg($zone) . " IN " . escapeshellarg($view));
 		unset($zoneDataNew);
 		unset($zoneData);
@@ -151,7 +158,8 @@ function binddump_strip_after_string($str, $char)
 		return $str;
 	}
 }
-function binddump_mb_explode_escaped($delimiter, $str, $trim_outer_quote_whitespace = true,  $escapeChar = '\\', $quoteChar = '"', $encoding = 'UTF-8') {
+function binddump_mb_explode_escaped($delimiter, $str, $trim_outer_quote_whitespace = true, $escapeChar = '\\', $quoteChar = '"', $encoding = 'UTF-8')
+{
 	$split = [];
 	$index = 0;
 	$in_quotes = false;
@@ -165,31 +173,31 @@ function binddump_mb_explode_escaped($delimiter, $str, $trim_outer_quote_whitesp
 		$char = mb_substr($str, $x, 1, $encoding);
 
 		// Detect escape char
-		if ($char === $escapeChar && !$is_escaped){
+		if ($char === $escapeChar && !$is_escaped) {
 			$is_escaped = true;
 			continue;
 		}
 
 		// detect if in quotes
-		if ($char === $quoteChar && !$is_escaped){
+		if ($char === $quoteChar && !$is_escaped) {
 			$in_quotes = ($in_quotes === false);
-			if ($in_quotes){
+			if ($in_quotes) {
 				$was_in_quotes = true;
 			}
 		}
 
 		// detect delimiter
-		if ($char === $delimiter  && !$is_escaped && (!$in_quotes  || $delimiter === $quoteChar)){
-			$index ++;
+		if ($char === $delimiter && !$is_escaped && (!$in_quotes || $delimiter === $quoteChar)) {
+			$index++;
 			$split[$index] = '';
 			continue;
 		}
 
 		// whitespace handling outside quotes.
-		if ($trim_outer_quote_whitespace && !$in_quotes && $was_in_quotes && in_array($char , $whitespaces)){
-			if (in_array($char , $whitespaces)){
+		if ($trim_outer_quote_whitespace && !$in_quotes && $was_in_quotes && in_array($char, $whitespaces)) {
+			if (in_array($char, $whitespaces)) {
 				continue;
-			}else{
+			} else {
 				$was_in_quotes = false;
 			}
 		}
@@ -198,19 +206,20 @@ function binddump_mb_explode_escaped($delimiter, $str, $trim_outer_quote_whitesp
 		$is_escaped = false;
 	}
 
-    return $split;
+	return $split;
 }
 
 // Parse files created with RNDC dumpdb -zones
 // parse the zone file which was exported with "named-compilezone -F text" or "RNDC dumpdb -zones"
-function binddump_parse_rndc_zone_dump($value, $zone = '', $include_comment_only = false) {
+function binddump_parse_rndc_zone_dump($value, $zone = '', $include_comment_only = false)
+{
 	$reg_host = "{(?<name>.+?)?(?:\s+?(?<ttl>\d*))?\s+(?<class>IN)?\s+(?<type>\p{L}+)\s+(?<rdata>.*)}";
 	$regzone = "{;.+?\'(?<zone>.+?)\/.+/(?<view>.*)\'}";
 	$zone_data_parsed = [];
 
 	if ($value) {
-		if ($zone !== '' && !str_ends_with($zone,'.')){
-			$zone .=  '.';
+		if ($zone !== '' && !str_ends_with($zone, '.')) {
+			$zone .= '.';
 		}
 
 		$view = '';
@@ -232,45 +241,45 @@ function binddump_parse_rndc_zone_dump($value, $zone = '', $include_comment_only
 			// split comments and values
 			$split_comment = binddump_mb_explode_escaped(';', $line);
 			$line_without_comment = trim($split_comment[0]);
-			
+
 			// everything after the first ; will be used as comment
 			unset($split_comment[0]);
 			$line_comment = implode(';', $split_comment);
 
-				if (!$item_continue) {
-					// detect multiline start
-					$split_multiline = binddump_mb_explode_escaped('(', $line);
-					if (count($split_multiline) > 1){
-						$item_continue = [
-							'comment' => $line_comment, 
-							'raw' => implode('', $split_multiline), 
-							'index' => $index
-						];
-						continue;
-					} else {
-						$item = [
-							'comment' => $line_comment, 
-							'raw' => $line_without_comment, 
-							'index' => $index
-						];
-					}
+			if (!$item_continue) {
+				// detect multiline start
+				$split_multiline = binddump_mb_explode_escaped('(', $line);
+				if (count($split_multiline) > 1) {
+					$item_continue = [
+						'comment' => $line_comment,
+						'raw' => implode('', $split_multiline),
+						'index' => $index
+					];
+					continue;
 				} else {
-					// detect multiline end
-					$split_multiline = binddump_mb_explode_escaped(')', $line);
-					if (count($split_multiline) > 1){
-						$item_continue['raw'] .= implode('', $split_multiline);
-						$item = $item_continue;
-						$item_continue = false;
-					}else{
-						$item_continue['comment'] .= ' ' . $line_comment;
-						$item_continue['raw'] .= ' ' . $line_without_comment;
-						continue;
-					}
+					$item = [
+						'comment' => $line_comment,
+						'raw' => $line_without_comment,
+						'index' => $index
+					];
 				}
+			} else {
+				// detect multiline end
+				$split_multiline = binddump_mb_explode_escaped(')', $line);
+				if (count($split_multiline) > 1) {
+					$item_continue['raw'] .= implode('', $split_multiline);
+					$item = $item_continue;
+					$item_continue = false;
+				} else {
+					$item_continue['comment'] .= ' ' . $line_comment;
+					$item_continue['raw'] .= ' ' . $line_without_comment;
+					continue;
+				}
+			}
 
-				$item['raw'] = trim($item['raw']);
-				$item['comment'] = trim($item['comment']);
-				array_push($data_rows, $item);
+			$item['raw'] = trim($item['raw']);
+			$item['comment'] = trim($item['comment']);
+			array_push($data_rows, $item);
 			$index++;
 		}
 
@@ -324,8 +333,12 @@ function binddump_parse_rndc_zone_dump($value, $zone = '', $include_comment_only
 					'class' => strtoupper($matches['class'])
 				];
 
-				if (!$record['name']) { $record['name'] = $last_name; }
-				if (!$record['ttl']) { $record['ttl'] = $defaultTTL; }
+				if (!$record['name']) {
+					$record['name'] = $last_name;
+				}
+				if (!$record['ttl']) {
+					$record['ttl'] = $defaultTTL;
+				}
 
 				// convert name to FQDN
 				if ($record['name'] == '@' || $record['name'] == '.') {
@@ -424,7 +437,7 @@ function binddump_expand_zone_record(&$record)
 
 		case 'TXT':
 		case 'SPF': //SPF does not realy exist but BIND threats it like TXT
-			$record['txt'] = binddump_unescape_dns_string(implode('', binddump_mb_explode_escaped('"',$record['rdata'])));
+			$record['txt'] = binddump_unescape_dns_string(implode('', binddump_mb_explode_escaped('"', $record['rdata'])));
 			break;
 
 		case 'CNAME':
@@ -472,7 +485,7 @@ function binddump_collapse_zone_record(&$record)
 			break;
 
 		case 'TXT':
-        case 'SPF':
+		case 'SPF':
 			// escape string and split by 127 chars... aprox 255 byte.
 			$str = mb_str_split(binddump_escape_dns_string($record['txt']), 127, 'UTF-8');
 			$record['rdata'] = implode('" "', array_filter($str, 'strlen'));
@@ -559,7 +572,8 @@ function binddump_waitfor_string_in_file($filename, $string, $timeout)
 	throw new Exception('Timeout while waiting for end of file');
 }
 
-function binddump_get_zonelist(){
+function binddump_get_zonelist()
+{
 	global $config;
 
 	if (is_array($config['installedpackages']['bindzone'])) {
@@ -572,7 +586,23 @@ function binddump_get_zonelist(){
 	return $bindzone;
 }
 
-function binddump_reverse_zonename($zone) {
+function binddump_re_reverse_zonename($name){
+	if (str_ends_with($name,'.ip6.arpa')){
+		return substr($name,0,-9);
+	}
+	if (str_ends_with($name,'.in-addr.arpa')){
+		return substr($name,0,-13);
+	}
+	if (str_ends_with($name,'.ip6.arpa.')){
+		return substr($name,0,-10);
+	}
+	if (str_ends_with($name,'.in-addr.arpa.')){
+		return substr($name,0,-14);
+	}
+	return $name;
+}
+function binddump_reverse_zonename($zone)
+{
 	if ($zone['reverso'] == "on") {
 		if ($zone['reversv6o'] == "on") {
 			return $zone['name'] . ".ip6.arpa";
