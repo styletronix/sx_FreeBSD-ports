@@ -35,7 +35,6 @@ do-install:
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/packages/binddump/binddump.php ${STAGEDIR}${PREFIX}/www/packages/binddump
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/packages/binddump/binddump.js ${STAGEDIR}${PREFIX}/www/packages/binddump
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/packages/binddump/zoneEdit.php ${STAGEDIR}${PREFIX}/www/packages/binddump
-	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/packages/binddump/zoneEdit.js ${STAGEDIR}${PREFIX}/www/packages/binddump
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/packages/binddump/index.php ${STAGEDIR}${PREFIX}/www/packages/binddump
 	${INSTALL_DATA} ${FILESDIR}${DATADIR}/info.xml ${STAGEDIR}${DATADIR}
 	
