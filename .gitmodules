@@ -1,0 +1,3 @@
+[submodule "sysutils/pfSense-pkg-BindDump/files/usr/local/www/packages/binddump/bootstable"]
+	path = sysutils/pfSense-pkg-BindDump/files/usr/local/www/packages/binddump/bootstable
+	url = https://github.com/styletronix/bootstable
