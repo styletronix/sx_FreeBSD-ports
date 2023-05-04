@@ -13,6 +13,23 @@ $rndc = "/usr/local/sbin/rndc -q -c {$rndc_conf_path}";
 
 
 if ($_POST) {
+    if (!empty($_POST['getList'])) {
+        try {
+            $selectedZone = explode('__', $_POST['zone']);
+            $zoneview = $selectedZone[0];
+            $zonename = $selectedZone[1];
+            $zonename_reverse = $selectedZone[2];
+            $zonetype = $selectedZone[3];
+
+            $zone_data = binddump_compilezone($zoneview, $zonename_reverse, $zonetype);
+            $zone_data_parsed = binddump_parse_rndc_zone_dump($zone_data, $zonename_reverse, false);
+            echo json_encode($zone_data_parsed, JSON_UNESCAPED_UNICODE);
+            exit;
+        } catch (Exception $e) {
+            die($e->getMessage());
+        }
+    }
+
     $input_errors = array();
     $post = $_POST;
 
@@ -33,12 +50,12 @@ if ($_POST) {
     $zonename_reverse = $selectedZone[2];
     $zonetype = $selectedZone[3];
 
-    if ($loadZone){
+
+    if ($loadZone) {
         try {
             $post['zone_data'] = binddump_compilezone($zoneview, $zonename_reverse);
         } catch (Exception $e) {
-
-	        $zrev = binddump_re_reverse_zonename($zonename_reverse);
+            $zrev = binddump_re_reverse_zonename($zonename_reverse);
             $post['zone_data'] = $zrev; //'[error]';
             $input_errors[] = $e->getMessage();
             unset($_POST["save"]);
@@ -93,7 +110,7 @@ if ($_POST) {
         if ($resultCode !== 0) {
             $input_errors[] = "named-checkzone throwed an exception. Code {$resultCode} \n " . implode("\n", $output);
         } else {
-            try{
+            try {
                 $post['zone_data'] = binddump_compilezone($zoneview, $zonename_reverse);
                 $post['zone_editable'] = "true";
             } catch (Exception $e) {
@@ -101,10 +118,18 @@ if ($_POST) {
                 $input_errors[] = $e->getMessage();
                 $post['zone_editable'] = "false";
             }
-            
+
             $savemsg = implode("\n", $output) . "\n\n Zone frozen and file reloaded.\n Don't forget to END EDIT before leaving.";
         }
+
+
     }
+}
+
+if ($post['zone_data']) {
+    $zone_data_parsed = binddump_parse_rndc_zone_dump($post['zone_data'], $zonename_reverse, false);
+} else {
+    $zone_data_parsed = [];
 }
 
 $pgtitle = array(gettext("Status"), gettext("Edit zone"));
@@ -119,8 +144,8 @@ display_top_tabs($tab_array);
 
 $zonelist = [];
 foreach (binddump_get_zonelist() as $zone) {
-    if($zone['type'] == 'master'){
-        $zonelist[$zone['view'] . '__' . $zone['name'] . '__' . binddump_reverse_zonename($zone) . '__' . $zone['type']] = binddump_reverse_zonename($zone) . '  (' . $zone['view'] . ')' ;
+    if ($zone['type'] == 'master') {
+        $zonelist[$zone['view'] . '__' . $zone['name'] . '__' . binddump_reverse_zonename($zone) . '__' . $zone['type']] = binddump_reverse_zonename($zone) . '  (' . $zone['view'] . ')';
     }
 }
 ksort($zonelist);
@@ -138,38 +163,55 @@ if ($savemsg) {
 <form class="form-horizontal" method="post" action="zoneEdit.php" enctype="multipart/form-data">
     <div class="panel panel-default">
         <div class="panel-heading">
-            <h2 class="panel-title"><?=gettext('Zone')?></h2>
+            <h2 class="panel-title">
+                <?= gettext('Zone') ?>
+            </h2>
         </div>
         <div class="panel-body">
             <div class="form-group">
                 <label for="zoneselect" class="col-sm-2 control-label">
-                    <span><?=gettext('Zone')?></span>
+                    <span>
+                        <?= gettext('Zone') ?>
+                    </span>
                 </label>
                 <div class="col-sm-10">
                     <select class="form-control" name="zoneselect" id="zoneselect" onchange="this.form.submit();">
-                        <option value=""><?=gettext('Select Zone...')?></option>
+                        <option value="">
+                            <?= gettext('Select Zone...') ?>
+                        </option>
                         <? foreach ($zonelist as $key => $value) { ?>
-                            <option <? if ($key == $post['current_zone']){print('selected');} ?> value="<?=$key?>"><?=$value?></option>
+                            <option <? if ($key == $post['current_zone']) {
+                                print('selected');
+                            } ?> value="<?= $key ?>"><?= $value ?>
+                            </option>
                         <? } ?>
                     </select>
-                        </div>
+                </div>
             </div>
             <div class="form-group">
                 <label for="load" class="col-sm-2 control-label">
-                    <span><?=gettext('Actions')?></span>
+                    <span>
+                        <?= gettext('Actions') ?>
+                    </span>
                 </label>
                 <div class="col-sm-2">
-                    <input class="btn btn-primary" type="submit" value="<?=gettext('Reload Zone')?>" name="load" id="load">
+                    <input class="btn btn-primary" type="submit" value="<?= gettext('Reload Zone') ?>" name="load"
+                        id="load">
                 </div>
                 <div class="col-sm-2">
-                    <input class="btn btn-primary" type="submit" value="<?=gettext('Start Edit')?>" name="freeze" id="freeze">
-                    <span class="help-block"><?=gettext('While in Edit-Mode, DDNS Updates are disabled.')?></span>
+                    <input class="btn btn-primary" type="submit" value="<?= gettext('Start Edit') ?>" name="freeze"
+                        id="freeze">
+                    <span class="help-block">
+                        <?= gettext('While in Edit-Mode, DDNS Updates are disabled.') ?>
+                    </span>
                 </div>
                 <div class="col-sm-2">
-                    <input class="btn btn-primary" type="submit" value="<?=gettext('End Edit')?>" name="thaw" id="thaw">
+                    <input class="btn btn-primary" type="submit" value="<?= gettext('End Edit') ?>" name="thaw"
+                        id="thaw">
                 </div>
                 <div class="col-sm-2">
-                    <input class="btn btn-primary" type="submit" value="<?=gettext('End Edit')?> -- <?=gettext('All Zones')?>" name="thawall" id="thawall">
+                    <input class="btn btn-primary" type="submit"
+                        value="<?= gettext('End Edit') ?> -- <?= gettext('All Zones') ?>" name="thawall" id="thawall">
                 </div>
             </div>
         </div>
@@ -177,10 +219,46 @@ if ($savemsg) {
 
     <div class="panel panel-default">
         <div class="panel-heading">
-            <h2 class="panel-title"><?=gettext('Edit Zone')?></h2>
+            <h2 class="panel-title">
+                <?= gettext('Edit Zone File') ?>
+            </h2>
         </div>
         <div class="panel-body">
-            <textarea rows="25" class="col-sm-12 form-control" name="zone_data" id="zone_data" wrap="off" <? if ($post['zone_editable'] !== 'true') {print('readonly="readonly"'); } ?> ><?= $post['zone_data'] ?></textarea>
+            <textarea rows="10" class="col-sm-12 form-control" name="zone_data" id="zone_data" wrap="off" <? if ($post['zone_editable'] !== 'true') {
+                print('readonly="readonly"');
+            } ?>><?= $post['zone_data'] ?></textarea>
+        </div>
+    </div>
+
+    <div class="panel-body table-responsive">
+        <table id="zonerecordlist" class="table table-striped table-hover table-condensed sortable-theme-bootstrap"
+            data-sortable>
+            <thead>
+                <tr data-keyfieldname="hash">
+                    <th data-fieldname="name">
+                        <?= gettext("Name") ?>
+                    </th>
+                    <th data-fieldname="type">
+                        <?= gettext("Type") ?>
+                    </th>
+                    <th data-fieldname="rdata">
+                        <?= gettext("Data") ?>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+
+            </tbody>
+        </table>
+        <div class="col-sm-10 col-sm-offset-2">
+            <button class="btn btn-primary" type="submit" value="<?= gettext('Save') ?>" name="save" id="save"><i
+                    class="fa fa-save icon-embed-btn"> </i>
+                <?= gettext('Save') ?>
+            </button>
+            <button class="btn btn-primary" type="button" value="<?= gettext('Add') ?>" id="btnNewRow"><i
+                    class="fa fa-add icon-embed-btn"> </i>
+                <?= gettext('Add') ?>
+            </button>
         </div>
     </div>
 
@@ -193,26 +271,20 @@ if ($savemsg) {
                     </button>
                     <h3 class="modal-title">Aktion</h3>
                 </div>
-                <!--				<form class="form-horizontal" action="" method="post"><input type='hidden' name='__csrf_magic' value="sid:559d4e4b09aef7ecd19d95821c0d10a3d4114043,1682931991" /> -->
                 <div class="modal-body">
                     <div class="form-group">
                         <label for="dlg_updatestatus_text" class="col-sm-2 control-label">
-
                         </label>
-                        <div class="col-sm-10">
+                        <div class="col-sm-8">
                             <textarea rows="10" class="row-fluid col-sm-10" name="dlg_updatestatus_text"
                                 id="dlg_updatestatus_text" wrap="off">...Loading...</textarea>
-
-
                         </div>
-
                     </div>
                 </div>
                 <div class="modal-footer">
                     <input class="btn btn-primary" type="submit" value="Schliessen" name="save" id="save"
                         data-dismiss="modal">
                 </div>
-                <!--				</form> -->
             </div>
         </div>
     </div>
@@ -227,7 +299,7 @@ if ($savemsg) {
                 </div>
                 <div class="modal-body">
                     <div class="form-group">
-                        <label class="col-sm-2 control-label">
+                        <label class="col-sm-8 control-label">
                             <span>dlg_wait_text</span>
                         </label>
                         <div class="col-sm-10">
@@ -246,42 +318,123 @@ if ($savemsg) {
         </div>
     </div>
 
-    <input class="form-control" name="current_zone" id="current_zone" type="hidden" value="<?= $post['current_zone'] ?>" />
-    <input class="form-control" name="zone_editable" id="zone_editable" type="hidden" value="<?= $post['zone_editable'] ?>" />
-
-    <div class="col-sm-10 col-sm-offset-2">
-        <button class="btn btn-primary" type="submit" value="Speichern" name="save" id="save"><i class="fa fa-save icon-embed-btn"> </i>Speichern</button>
-    </div>
 </form>
-
-<?
-// $form = new Form();
-// $form->setMultipartEncoding();
-
-// /* #region section ZONE */
-// $section = new Form_Section('Zone');
-
-// $zoneselect = new Form_Select('zoneselect', 'Zone', $post['zoneselect'], $zonelist, false);
-// $zoneselect->setOnchange("this.form.submit();");
-// $section->addInput($zoneselect);
-
-// print $form;
-
-?>
-<script type="text/javascript">
-    events.push(function () {
-        // thaw all zones before leaving page
-        $(window).on('beforeunload', function () {
-            $.ajax({
-                url: 'zoneEdit.php',
-                type: 'POST',
-                data: {
-                    'thawall': 'thawall'
-                }
-            });
-        });
-    });
-</script>
 <?
 include('foot.inc');
 ?>
+<script src="bootstable.js"></script>
+<script type="text/javascript">
+    // function rowAction(event) {
+    //     var index = $(this).closest('tr').attr('data-index');
+    //     var hash = $(this).closest('tr').attr('data-hash');
+    //     var row = $(this).closest('tr').first();
+
+    //     switch (event.data.action) {
+    //         case 'edit':
+    //             editRow(index, hash, row);
+    //         case 'undo':
+    //             undoRow(index, hash, row);
+    //             break;
+    //         case 'delete':
+    //             deleteRow(index, hash, row);
+    //             break;
+    //     }
+
+    //     event.preventDefault();
+    // };
+    // function editRow(num, hash, row) {
+    //     var data = row.data();
+    //     $('#edit_object').val(JSON.stringify(data));
+    //     $('#edit_name').val(data.name);
+    //     $('#edit_type').val(data.type);
+    //     $('#edit_rdata').val(data.rdata);
+    //     $('#dlg_editRow').modal('show');
+    // }
+    // function deleteRow(num, hash, row) {
+    //     var tredit = document.getElementById('editRow_' + num);
+    //     hideElement(tredit, true);
+    //     row.attr("data-row-action", "deleted");
+    // }
+    // function undoRow(num, hash, row) {
+    //     row.attr("data-row-action", "");
+    // }
+
+    // function hideElement(element, hide) {
+    //     if (element) {
+    //         if (hide) {
+    //             $(element).addClass('hidden');
+    //         } else {
+    //             $(element).removeClass('hidden');
+    //         }
+    //     }
+    // }
+
+    function showMessage($text) {
+        $('#dlg_updatestatus_text').text($text);
+        $('#dlg_updatestatus_text').attr('readonly', true);
+        $('#dlg_updatestatus').modal('show');
+    }
+    function showWait($text) {
+        $('#dlg_wait_text').text($text + '<br/><br/>Please wait for the process to complete.<br/><br/>This dialog will auto-close when the update is finished.<br/><br/>' +
+            '<i class="content fa fa-spinner fa-pulse fa-lg text-center text-info"></i>');
+        $('#dlg_wait_text').attr('readonly', true);
+        $('#dlg_wait').modal('show');
+    }
+    function hideWait() {
+        $('#dlg_wait').modal('hide');
+    }
+
+    function reloadData() {
+        var zone = $('#zoneselect').find(":selected").val();
+        showWait('Loading new Zone Data');
+        
+        TableClear('zonerecordlist');
+        $.ajax(
+            {
+                type: 'post',
+                data: {
+                    getList: 'true',
+                    zone: zone
+                },
+                success: function (data) {
+                    hideWait();
+                    if (data.startsWith('[')) {
+                        TableFromJson('zonerecordlist', data);
+                    } else {
+                        showMessage(data);
+                    }
+                },
+                error: function (data) {
+                    hideWait();
+                    showMessage(data.responseText);
+                }
+            });
+
+            
+    }
+
+    events.push(function () {
+        // $(window).on('beforeunload', function () {
+        //     $.ajax({
+        //         url: 'zoneEdit.php',
+        //         type: 'POST',
+        //         data: {
+        //             'thawall': 'thawall'
+        //         }
+        //     });
+        // });
+
+        // $("a[data-action='edit']").on("click", {action:"edit"}, rowAction);
+        // $("a[data-action='save']").on("click", {action:"save"}, rowAction);
+        // $("a[data-action='delete']").on("click", {action:"delete"}, rowAction);
+        // $("a[data-action='undo']").on("click", {action:"undo"}, rowAction);
+        // $("tr[data-edit='true']").on("dblclick", {action:"edit"}, rowAction);
+
+        $('#zonerecordlist').SetEditable();
+        $('#btnNewRow').click(function () {
+            rowAddNewAndEdit('zonerecordlist');
+        });
+
+        reloadData();
+    });
+</script>
