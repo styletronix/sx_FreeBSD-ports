@@ -322,53 +322,10 @@ if ($savemsg) {
 <?
 include('foot.inc');
 ?>
-<script src="bootstable.js"></script>
+<script src="sxTable.js"></script>
 <script type="text/javascript">
-    // function rowAction(event) {
-    //     var index = $(this).closest('tr').attr('data-index');
-    //     var hash = $(this).closest('tr').attr('data-hash');
-    //     var row = $(this).closest('tr').first();
-
-    //     switch (event.data.action) {
-    //         case 'edit':
-    //             editRow(index, hash, row);
-    //         case 'undo':
-    //             undoRow(index, hash, row);
-    //             break;
-    //         case 'delete':
-    //             deleteRow(index, hash, row);
-    //             break;
-    //     }
-
-    //     event.preventDefault();
-    // };
-    // function editRow(num, hash, row) {
-    //     var data = row.data();
-    //     $('#edit_object').val(JSON.stringify(data));
-    //     $('#edit_name').val(data.name);
-    //     $('#edit_type').val(data.type);
-    //     $('#edit_rdata').val(data.rdata);
-    //     $('#dlg_editRow').modal('show');
-    // }
-    // function deleteRow(num, hash, row) {
-    //     var tredit = document.getElementById('editRow_' + num);
-    //     hideElement(tredit, true);
-    //     row.attr("data-row-action", "deleted");
-    // }
-    // function undoRow(num, hash, row) {
-    //     row.attr("data-row-action", "");
-    // }
-
-    // function hideElement(element, hide) {
-    //     if (element) {
-    //         if (hide) {
-    //             $(element).addClass('hidden');
-    //         } else {
-    //             $(element).removeClass('hidden');
-    //         }
-    //     }
-    // }
-
+    var table1;
+    
     function showMessage($text) {
         $('#dlg_updatestatus_text').text($text);
         $('#dlg_updatestatus_text').attr('readonly', true);
@@ -387,8 +344,9 @@ include('foot.inc');
     function reloadData() {
         var zone = $('#zoneselect').find(":selected").val();
         showWait('Loading new Zone Data');
-        
-        TableClear('zonerecordlist');
+
+        table1.sxTable("clear");
+
         $.ajax(
             {
                 type: 'post',
@@ -399,7 +357,7 @@ include('foot.inc');
                 success: function (data) {
                     hideWait();
                     if (data.startsWith('[')) {
-                        TableFromJson('zonerecordlist', data);
+                        table1.sxTable("fromJson", data);
                     } else {
                         showMessage(data);
                     }
@@ -409,8 +367,6 @@ include('foot.inc');
                     showMessage(data.responseText);
                 }
             });
-
-            
     }
 
     events.push(function () {
@@ -424,15 +380,25 @@ include('foot.inc');
         //     });
         // });
 
-        // $("a[data-action='edit']").on("click", {action:"edit"}, rowAction);
-        // $("a[data-action='save']").on("click", {action:"save"}, rowAction);
-        // $("a[data-action='delete']").on("click", {action:"delete"}, rowAction);
-        // $("a[data-action='undo']").on("click", {action:"undo"}, rowAction);
-        // $("tr[data-edit='true']").on("dblclick", {action:"edit"}, rowAction);
-
-        $('#zonerecordlist').SetEditable();
-        $('#btnNewRow').click(function () {
-            rowAddNewAndEdit('zonerecordlist');
+        table1 = $('#zonerecordlist').sxTable({
+            columns: [
+                {
+                    fieldname: "name",
+                    caption: "Name"
+                },
+                {
+                    fieldname: "type",
+                    caption: "Type"
+                },
+                {
+                    fieldname: "rdata",
+                    caption: "RData"
+                },
+                {
+                    fieldname: "_buttons",
+                    caption: ""
+                }
+            ]
         });
 
         reloadData();
