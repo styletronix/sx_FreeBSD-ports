@@ -160,17 +160,21 @@ if ($savemsg) {
 
 ?>
 <style>
-    [data-status="deleted"]{
-        text-decoration: line-through ;
+    [data-status="deleted"] {
+        text-decoration: line-through;
         opacity: 0.5;
     }
-    [data-status="changed"]{
-        font-weight: bold;;
+
+    [data-status="changed"] {
+        font-weight: bold;
+        ;
 
     }
-    [data-status="added"]{
-        font-weight: bold;;
-        
+
+    [data-status="added"] {
+        font-weight: bold;
+        ;
+
     }
 </style>
 
@@ -266,7 +270,7 @@ if ($savemsg) {
             </tbody>
         </table>
         <div class="col-sm-10 col-sm-offset-2">
-            <button class="btn btn-primary" type="submit" value="<?= gettext('Save') ?>" name="save" id="save"><i
+            <button class="btn btn-primary" type="button" value="<?= gettext('Save') ?>" name="save" id="save" onclick="submitChanges();"><i
                     class="fa fa-save icon-embed-btn"> </i>
                 <?= gettext('Save') ?>
             </button>
@@ -340,7 +344,7 @@ include('foot.inc');
 <script src="sxTable.js"></script>
 <script type="text/javascript">
     var table1;
-    
+
     function showMessage($text) {
         $('#dlg_updatestatus_text').text($text);
         $('#dlg_updatestatus_text').attr('readonly', true);
@@ -356,6 +360,17 @@ include('foot.inc');
         $('#dlg_wait').modal('hide');
     }
 
+    function submitChanges(){
+        showWait('Saving Zone Data');
+
+        var data = table1.sxTable("getChangeSet");
+        alert(JSON.stringify(data));
+
+       
+        //TODO: Save changes.....
+        table1.sxTable("mergeChanges");
+        hideWait();
+    }
     function reloadData() {
         var zone = $('#zoneselect').find(":selected").val();
         showWait('Loading new Zone Data');
@@ -416,8 +431,74 @@ include('foot.inc');
                     fieldname: "_buttons",
                     caption: "",
                     editable: false
+                },
+            ],
+            templateEditor: function (e) {
+                if (e.fieldname == "type") {
+                    var dat = $('<select>');
+                    dat.append($("<option />").val('A').text('A'));
+                    dat.append($("<option />").val('AAAA').text('AAAA'));
+                    dat.append($("<option />").val('TXT').text('TXT'));
+                    dat.append($("<option />").val('SPF').text('SPF'));
+                    dat.append($("<option />").val('MX').text('MX'));
+                    dat.append($("<option />").val('NS').text('NS'));
+                    dat.append($("<option />").val('SOA').text('SOA'));
+                    dat.append($("<option />").val('CNAME').text('CNAME'));
+                    dat.append($("<option />").val('PTR').text('PTR'));
+                    dat.append($("<option />").val('SRV').text('SRV'));
+                    dat.append($("<option />").val('DCHID').text('DCHID'));
+                    dat.append($("<option />").val('CERT').text('CERT'));
+                    dat.append($("<option />").val('DNSKEY').text('DNSKEY'));
+                    dat.append($("<option />").val('RRSIG').text('RRSIG'));
+                    dat.append($("<option />").val('CDNSKEY').text('CDNSKEY'));
+                    dat.append($("<option />").val('NSEC').text('NSEC'));
+                    dat.append($("<option />").val('TA').text('TA'));
+                    dat.append($("<option />").val('IPSECKEY').text('IPSECKEY'));
+                    dat.append($("<option />").val('KEY').text('KEY'));
+                    dat.append($("<option />").val('DNAME').text('DNAME'));
+                    dat.append($("<option />").val('AFSDB').text('AFSDB'));
+                    dat.append($("<option />").val('APL').text('APL'));
+                    dat.append($("<option />").val('CAA').text('CAA'));
+                    dat.append($("<option />").val('CDS').text('CDS'));
+                    dat.append($("<option />").val('CSYNC').text('CSYNC'));
+                    dat.append($("<option />").val('DLV').text('DLV'));
+                    dat.append($("<option />").val('DS').text('DS'));
+                    dat.append($("<option />").val('EUI48').text('EUI48'));
+                    dat.append($("<option />").val('EUI64').text('EUI64'));
+                    dat.append($("<option />").val('HINFO').text('HINFO'));
+                    dat.append($("<option />").val('HIP').text('HIP'));
+                    dat.append($("<option />").val('HTTPS').text('HTTPS'));
+                    dat.append($("<option />").val('KX').text('KX'));
+                    dat.append($("<option />").val('NAPTR').text('NAPTR'));
+                    dat.append($("<option />").val('LOC').text('LOC'));
+                    dat.append($("<option />").val('OPENPGPKEY').text('OPENPGPKEY'));
+                    dat.append($("<option />").val('NSEC3').text('NSEC3'));
+                    dat.append($("<option />").val('NSEC3PARAM').text('NSEC3PARAM'));
+                    dat.append($("<option />").val('RP').text('RP'));
+                    dat.append($("<option />").val('SIG').text('SIG'));
+                    dat.append($("<option />").val('SMIMEA').text('SMIMEA'));
+                    dat.append($("<option />").val('SSHFP').text('SSHFP'));
+                    dat.append($("<option />").val('SVCB').text('SVCB'));
+                    dat.append($("<option />").val('TKEY').text('TKEY'));
+                    dat.append($("<option />").val('TSIG').text('TSIG'));
+                    dat.append($("<option />").val('TLSA').text('TLSA'));
+                    dat.append($("<option />").val('URI').text('URI'));
+                    dat.append($("<option />").val('ZONEMD').text('ZONEMD'));
+                    dat.append($("<option />").val('AXFR').text('AXFR'));
+                    dat.append($("<option />").val('IXFR').text('IXFR'));
+                    dat.addClass("form-control");
+                    dat.val(e.value);
+                    dat.find('option[value="' + e.value + '"]').prop('selected', true);
+                    return dat;
+                } else {
+                    var dat = $("<input>");
+                    dat.addClass("form-control");
+                    dat.attr("type", "text");
+                    dat.val(e.value)
+                    dat.after($("<span>")).text("");;
+                    return dat;
                 }
-            ]
+            }
         });
 
         reloadData();

@@ -13,7 +13,7 @@ $.widget("sx.sxTable", {
 
     templateButtonContainer: function (e) {
       return $("<div>")
-        .addClass("tn-group pull-right")
+        .addClass("action-icons")
     },
 
     templateButtonEdit: function (e) {
@@ -119,6 +119,9 @@ $.widget("sx.sxTable", {
     },
 
     editorSetValue: function (e) {
+      if (e?.editor[0]?.tagName == "SELECT"){
+        dat.find('option[value="' + e.value + '"]').prop('selected', true);
+      }
       e.editor.val(e.value);
     }
   },
@@ -232,7 +235,6 @@ $.widget("sx.sxTable", {
   getChangeSet: function(){
     var self = this;
 
-    var self = e.instance;
     var table = self.element;
     var tableBody = table.find('tbody');
 
@@ -245,9 +247,9 @@ $.widget("sx.sxTable", {
     var data = [];
 
     tableBody.children("tr").each(function (index, value) {
-      var rowdata = value.data("datarow");
-      var changed = value.data("changedvalues");
-      var status = value.attr("data-status");
+      var rowdata = $(value).data("datarow");
+      var changed = $(value).data("changedvalues");
+      var status = $(value).attr("data-status");
       if (rowdata && (changed || status)){
         var rowresult = 
         data.push({
@@ -264,7 +266,6 @@ $.widget("sx.sxTable", {
 
   mergeChanges: function(){
     var self = this;
-    var self = e.instance;
     var table = self.element;
     var tableBody = table.find('tbody');
 
@@ -275,16 +276,16 @@ $.widget("sx.sxTable", {
     }
 
     tableBody.children("tr").each(function (index, value) {
-      var rowdata = value.data("datarow");
-      var changed = value.data("changedvalues");
-      var status = value.attr("data-status");
+      var rowdata = $(value).data("datarow");
+      var changed = $(value).data("changedvalues");
+      var status = $(value).attr("data-status");
       if (rowdata && (changed || status)){
         if (status == "deleted"){
           value.remove();
         }else{
           var datarow = Object.assign({}, rowdata, changed)
-          value.data("datarow",  datarow);
-          value.attr("data-status", null);
+          $(value).data("datarow",  datarow);
+          $(value).attr("data-status", null);
           self._leaveEditMode({
             instance: self,
             row: value,
