@@ -17,39 +17,61 @@ $.widget("sx.sxTable", {
     },
 
     templateButtonEdit: function (e) {
-      return $("<button>")
-        .attr("type", "button")
-        .addClass("btn btn-primary")
-        .append(
-          $("<span>").addClass("fa fa-edit")
-        )
+      var dat = $("<a>")
+        .attr("title", "Edit")
+        .addClass("fa fa-edit");
+      dat.after("&nbsp;");
+      return dat;
+
+      // return $("<button>")
+      //   .attr("type", "button")
+      //   .addClass("btn btn-primary")
+      //   .append(
+      //     $("<span>").addClass("fa fa-edit")
+      //   )
     },
 
     templateButtonDelete: function (e) {
-      return $("<button>")
-        .attr("type", "button")
-        .addClass("btn btn-danger")
-        .append(
-          $("<span>").addClass("fa fa-trash")
-        )
+      var dat = $("<a>")
+        .attr("title", "Delete")
+        .addClass("fa fa-trash");
+      dat.after("&nbsp;");
+      return dat;
+      // return $("<button>")
+      //   .attr("type", "button")
+      //   .addClass("btn btn-danger")
+      //   .append(
+      //     $("<span>").addClass("fa fa-trash")
+      //   )
     },
 
     templateButtonAccept: function (e) {
-      return $("<button>")
-        .attr("type", "button")
-        .addClass("btn btn-success")
-        .append(
-          $("<span>").addClass("fa fa-check")
-        )
+      var dat = $("<a>")
+        .attr("title", "Save")
+        .addClass("fa fa-check");
+      dat.after("&nbsp;");
+      return dat;
+      // return $("<button>")
+      //   .attr("type", "button")
+      //   .addClass("btn btn-success")
+      //   .append(
+      //     $("<span>").addClass("fa fa-check")
+      //   )
     },
 
     templateButtonCancel: function (e) {
-      return $("<button>")
-        .attr("type", "button")
-        .addClass("btn btn-warning")
-        .append(
-          $("<span>").addClass("fa fa-undo")
-        );
+      var dat = $("<a>")
+        .attr("title", "Cancel")
+        .addClass("fa fa-undo");
+      dat.after("&nbsp;");
+      return dat;
+
+      // return $("<button>")
+      //   .attr("type", "button")
+      //   .addClass("btn btn-warning")
+      //   .append(
+      //     $("<span>").addClass("fa fa-undo")
+      //   );
     },
 
     templateButtonColumn: function (e) {
@@ -61,7 +83,13 @@ $.widget("sx.sxTable", {
     },
 
     templateDataColumn: function (e) {
-      return $("<td>").text(e?.value);
+      return $("<td>");
+    },
+
+    templateDataContent: function (e) {
+      var dat = $("<span>");
+      dat.text(e?.value);
+      return dat;
     },
 
     templateDataRow: function (e) {
@@ -73,22 +101,25 @@ $.widget("sx.sxTable", {
     },
 
     templateHeadColumn: function (e) {
-      return $("<th>").text(e?.column?.caption);
+      var dat = $("<th>");
+      dat.text(e?.column?.caption);
+      return dat;
     },
 
     templateEditor: function (e) {
-      return $("<input>")
-        .addClass("form-control")
-        .attr("type", "text")
-        .value(e.value);
+      var dat = $("<input>");
+      dat.addClass("form-control");
+      dat.attr("type", "text");
+      dat.val(e.value);
+      return dat;
     },
 
     editorGetValue: function (e) {
-      return e.editor.value();
+      return e.editor.val();
     },
 
     editorSetValue: function (e) {
-      e.editor.value(e.value);
+      e.editor.val(e.value);
     }
   },
 
@@ -105,7 +136,7 @@ $.widget("sx.sxTable", {
 
     self.options.columns.forEach((value) => {
       var colFound = false;
-      row.find("th").each((index, val) => {
+      row.children("th").each((index, val) => {
         if ($(val).data("fieldname") == value.fieldname) {
           colFound = true;
         }
@@ -134,21 +165,21 @@ $.widget("sx.sxTable", {
   },
 
   _buttonHandler: function (e) {
-    if ($(this).data("action")) {
+    if ($(this).attr("data-action")) {
       var row = $(this).closest("tr[name=row]");
 
       if (e.data.row) {
-        switch ($(this).data("action")) {
-          case "edit":
+        switch ($(this).attr("data-action")) {
+          case "editrow":
             e.data.instance._startEdit(e.data);
             break;
-          case "delete":
+          case "deleterow":
             e.data.instance._delete(e.data);
             break;
-          case "cancel":
+          case "cancelrow":
             e.data.instance._cancelEdit(e.data);
             break;
-          case "accept":
+          case "acceptrow":
             e.data.instance._endEdit(e.data);
             break;
         }
@@ -165,54 +196,28 @@ $.widget("sx.sxTable", {
     this.options[key] = value;
   },
 
-  _butRowEdit: function (but) {
-    //Start the edition mode for a row.
-    var $row = $(but).parents('tr');
-    var $cols = $row.find('td');
-    if (ModoEdicion($row)) return;
-
-    if (!this._trigger("onBeforeBeginEdit", null, {})) {
-      return;
-    }
-
-    var focused = false;
-    IterarCamposEdit($cols, function ($td) {
-      var cont = $td.html();
-      //Save previous content in a hide <div>
-      var div = '<div style="display: none;">' + cont + '</div>';
-      var input = '<input class="form-control input-sm"  value="' + cont + '">';
-      $td.html(div + input);  //Set new content
-      //Set focus to first column
-      if (!focused) {
-        $td.find('input').focus();
-        focused = true;
-      }
-    });
-    SetButtonsEdit(but);
-
-    this._trigger("onBeginEdit", null, {})
-  },
-
   _getNewButtonColumn: function (e) {
     return _getBtnNormalMode(e);
   },
 
   _getBtnNormalMode: function (e) {
-    var td = this.options.templateDataRowButtonColumn();
     var div = this.options.templateButtonContainer().attr("name", "btnContainer");
-    div.append(this.options.templateButtonEdit().data("action", "edit"));
-    div.append(this.options.templateButtonDelete().data("action", "delete"));
-    td.append(div);
-    return td;
+    div.append(this.options.templateButtonEdit().attr("data-action", "editrow").attr("name", "btnrowedit"));
+    div.append(this.options.templateButtonDelete().attr("data-action", "deleterow").attr("name", "btnrowdelete"));
+    return div;
   },
 
   _getBtnEditMode: function (e) {
-    var td = this.options.templateDataRowButtonColumn();
     var div = this.options.templateButtonContainer().attr("name", "btnContainer");
-    div.append(this.options.templateButtonAccept().data("action", "accept"));
-    div.append(this.options.templateButtonCancel().data("action", "cancel"));
-    td.append(div);
-    return td;
+    div.append(this.options.templateButtonAccept().attr("data-action", "acceptrow").attr("name", "btnrowaccept"));
+    div.append(this.options.templateButtonCancel().attr("data-action", "cancelrow").attr("name", "btnrowcancel"));
+    return div;
+  },
+
+  _getBtnUndoMode: function (e) {
+    var div = this.options.templateButtonContainer().attr("name", "btnContainer");
+    div.append(this.options.templateButtonCancel().attr("data-action", "cancelrow").attr("name", "btnrowcancel"));
+    return div;
   },
 
   fromJson: function (data) {
@@ -224,20 +229,91 @@ $.widget("sx.sxTable", {
     });
   },
 
+  getChangeSet: function(){
+    var self = this;
+
+    var self = e.instance;
+    var table = self.element;
+    var tableBody = table.find('tbody');
+
+    if (self._currentEdit ){
+      if (!self._endEdit(self._currentEdit)){
+        return false;
+      }
+    }
+
+    var data = [];
+
+    tableBody.children("tr").each(function (index, value) {
+      var rowdata = value.data("datarow");
+      var changed = value.data("changedvalues");
+      var status = value.attr("data-status");
+      if (rowdata && (changed || status)){
+        var rowresult = 
+        data.push({
+          action: status,     // deleted, added, changed
+          original: rowdata,
+          changed: changed
+        });
+      }
+    });
+
+    return JSON.stringify(data);
+    unset(data);
+  },
+
+  mergeChanges: function(){
+    var self = this;
+    var self = e.instance;
+    var table = self.element;
+    var tableBody = table.find('tbody');
+
+    if (self._currentEdit ){
+      if (!self._endEdit(self._currentEdit)){
+        return false;
+      }
+    }
+
+    tableBody.children("tr").each(function (index, value) {
+      var rowdata = value.data("datarow");
+      var changed = value.data("changedvalues");
+      var status = value.attr("data-status");
+      if (rowdata && (changed || status)){
+        if (status == "deleted"){
+          value.remove();
+        }else{
+          var datarow = Object.assign({}, rowdata, changed)
+          value.data("datarow",  datarow);
+          value.attr("data-status", null);
+          self._leaveEditMode({
+            instance: self,
+            row: value,
+            datarow: datarow
+          })
+        }
+      }
+    });
+
+    return true;
+  },
+
   clear: function () {
     var self = this;
     var table = self.element;
 
-    table.find('tbody').empty;
+    table.find('tbody').empty();
   },
+
+  _currentEdit: null,
 
   addRow: function (datarow) {
     var self = this;
     var table = self.element;
 
     var row = table.find('thead tr');
-    var cols = row.find('th');
+    var cols = row.children('th');
     var tableBody = table.find('tbody');
+    var buttoncontainer;
 
     var newRow = self.options.templateDataRow({ datarow: datarow });
     newRow.data('datarow', datarow);
@@ -247,10 +323,21 @@ $.widget("sx.sxTable", {
       var newCol;
       var column = self._getColumnOptionsByName($(value).data("fieldname"));
       if (column === null) {
+        newCol = self.options.templateDataContent({
+          datarow: datarow,
+          column: column,
+          value: null
+        });
 
       } else if ($(value).data("fieldname") === '_buttons') {
-        newCol = self._getBtnNormalMode({ datarow: datarow });
-        newCol.on("click", "button",
+        newCol = self.options.templateDataRowButtonColumn({
+          datarow: datarow,
+          column: column,
+          value: datarow[$(value).data("fieldname")]
+        });
+        newCol.attr("name", "buttoncolumncontainer");
+        newCol.append(self._getBtnNormalMode({ datarow: datarow }));
+        newCol.on("click", "[name*='btnrow']",
           {
             instance: self,
             datarow: datarow,
@@ -259,50 +346,187 @@ $.widget("sx.sxTable", {
           },
           self._buttonHandler
         );
+        buttoncontainer = newCol;
+
       } else {
         newCol = self.options.templateDataColumn({
           datarow: datarow,
           column: column,
           value: datarow[$(value).data("fieldname")]
         });
+        newCol.append(self.options.templateDataContent({
+          datarow: datarow,
+          column: column,
+          value: datarow[$(value).data("fieldname")]
+        }));
       }
       newRow.append(newCol);
     });
 
     tableBody.append(newRow);
+    newRow.attr("data-action", "editrow")
+    newRow.on("dblclick", {
+      instance: self,
+      datarow: datarow,
+      row: newRow,
+      buttoncontainer: buttoncontainer
+    },
+      self._buttonHandler
+    );
   },
 
   _startEdit(e) {
-    // instance
-    // datarow
-    // row
-    // buttoncontainer
-    var col = e.buttoncontainer.parent();
-    e.buttoncontainer.remove();
+    var self = e.instance;
+    var table = self.element;
+    var tableBody = table.find('tbody');
 
-    var newCol = e.instance._getBtnEditMode({ datarow: e.datarow });
-    col.append(newCol);
-    newCol.on("click", "button", e, e.instance._buttonHandler);
-    e.buttoncontainer = newCol;
+    if (self._currentEdit !== null) {
+      if (!self._endEdit(e.instance._currentEdit)) {
+        return false;
+      }
+    }
+
+    self._currentEdit = e;
+
+    tableBody.find("[name=btnrowedit]").hide();
+    tableBody.find("[name=btnrowdelete]").hide();
+
+    // change buttons
+    var newCol = self._getBtnEditMode({ datarow: e.datarow });
+    e.buttoncontainer.empty()
+    e.buttoncontainer.append(newCol);
+
+    // change editors
+    var cols = self.element.find('thead tr').children("th");
+    var currentColumns = e.row.children("td");
+
+    cols.each((index, value) => {
+      var fieldname = $(value).data("fieldname");
+      var column = self._getColumnOptionsByName(fieldname);
+      if (column !== null && column.editable == true) {
+        var currentVal = e.datarow[fieldname];
+        var changes = e.row.data("changedValues");
+        if (changes && changes.hasOwnProperty(fieldname)) {
+          currentVal = changes[fieldname];
+        }
+
+        var editor = self.options.templateEditor({
+          datarow: e.datarow,
+          value: currentVal,
+          instance: self,
+          buttoncontainer: e.buttoncontainer,
+          fieldname: fieldname
+        });
+        editor.attr("name", "editfield");
+        $(currentColumns[index]).empty();
+        $(currentColumns[index]).append(editor);
+      }
+    });
+
+    return true;
+  },
+
+  _leaveEditMode(e) {
+    var self = e.instance;
+    var table = self.element;
+    var tableBody = table.find('tbody');
+
+    tableBody.find("[name=btnrowedit]").show();
+    tableBody.find("[name=btnrowdelete]").show();
+
+    if (!e.buttoncontainer){
+      e.buttoncontainer = e.row.find("[name=buttoncolumncontainer]");
+    }
+
+    // replace buttons
+    var newCol 
+    if (e.row.attr("data-status") == "deleted") {
+      newCol = self._getBtnUndoMode({ datarow: e.datarow });
+    }else{
+      newCol = self._getBtnNormalMode({ datarow: e.datarow });
+    }
+    e.buttoncontainer.empty()
+    e.buttoncontainer.append(newCol);
+
+    // change editors
+    var currentColumns = e.row.children("td");
+    var cols = self.element.find('thead').children("tr").children("th");
+    cols.each((index, value) => {
+      var fieldname = $(value).data("fieldname");
+      var column = self._getColumnOptionsByName(fieldname);
+      if (column !== null && column.editable == true && column.fieldname !== "_buttons") {
+        var currentVal = e.datarow[fieldname];
+        var changes = e.row.data("changedvalues");
+        if (changes && changes.hasOwnProperty(fieldname)) {
+          currentVal = changes[fieldname];
+        }
+
+        var newDataCol = self.options.templateDataContent({
+          datarow: e.datarow,
+          value: currentVal,
+          instance: self,
+          buttoncontainer: e.buttoncontainer,
+          fieldname: fieldname
+        });
+        $(currentColumns[index]).empty();
+        $(currentColumns[index]).append($(newDataCol));
+      }
+    });
+
+    self._currentEdit = null;
+
+    return true;
   },
 
   _cancelEdit(e) {
-      var col = e.buttoncontainer.parent();
-      e.buttoncontainer.remove();
-
-      var newCol = e.instance._getBtnNormalMode({ datarow: e.datarow });
-      col.append(newCol);
-      newCol.on("click", "button", e, e.instance._buttonHandler);
-      e.buttoncontainer = newCol;
+    var self = e.instance;
+    e.row.attr("data-status", "");
+    e.row.data("changedvalues", null);
+    self._leaveEditMode(e);
+    return true;
   },
 
   _endEdit(e) {
-    e.instance._cancelEdit(e);
-},
+    var self = e.instance;
+    var table = self.element;
+    var tableBody = table.find('tbody');
+    var changedValues = {};
 
-_delete(e) {
-  alert("delete");
-},
+    // change editors
+    var currentColumns = e.row.children("td");
+    var cols = self.element.find('thead').children("tr").children("th");
+    cols.each((index, value) => {
+      var fieldname = $(value).data("fieldname");
+      var column = self._getColumnOptionsByName(fieldname);
+      if (column !== null && column.editable == true && column.fieldname !== "_buttons") {
+
+        var newVal = self.options.editorGetValue({
+          fieldname: fieldname,
+          editor: $(currentColumns[index]).children("[name=editfield]")
+        });
+
+        changedValues[fieldname] = newVal;
+      }
+    });
+
+    // save data....
+    e.row.data("changedvalues", changedValues);
+    if (e.row.attr("data-status") !== "added"){
+      e.row.attr("data-status", "changed");
+    }
+
+    self._leaveEditMode(e);
+    return true;
+  },
+
+  _delete(e) {
+    var self = e.instance;
+
+    e.row.data("changedValues", null);
+    e.row.attr("data-status", "deleted");
+    self._leaveEditMode(e);
+    return true;
+  },
 
   _getColumnOptionsByName(fieldname) {
     var ret = null;
@@ -316,5 +540,3 @@ _delete(e) {
     return ret;
   }
 });
-
-

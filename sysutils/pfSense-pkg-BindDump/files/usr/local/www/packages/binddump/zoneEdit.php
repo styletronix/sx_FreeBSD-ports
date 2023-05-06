@@ -159,6 +159,21 @@ if ($savemsg) {
 }
 
 ?>
+<style>
+    [data-status="deleted"]{
+        text-decoration: line-through ;
+        opacity: 0.5;
+    }
+    [data-status="changed"]{
+        font-weight: bold;;
+
+    }
+    [data-status="added"]{
+        font-weight: bold;;
+        
+    }
+</style>
+
 
 <form class="form-horizontal" method="post" action="zoneEdit.php" enctype="multipart/form-data">
     <div class="panel panel-default">
@@ -384,19 +399,23 @@ include('foot.inc');
             columns: [
                 {
                     fieldname: "name",
-                    caption: "Name"
+                    caption: "Name",
+                    editable: true
                 },
                 {
                     fieldname: "type",
-                    caption: "Type"
+                    caption: "Type",
+                    editable: true
                 },
                 {
                     fieldname: "rdata",
-                    caption: "RData"
+                    caption: "RData",
+                    editable: true
                 },
                 {
                     fieldname: "_buttons",
-                    caption: ""
+                    caption: "",
+                    editable: false
                 }
             ]
         });
