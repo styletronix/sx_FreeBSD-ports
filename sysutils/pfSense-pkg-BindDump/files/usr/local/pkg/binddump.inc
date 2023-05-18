@@ -393,9 +393,12 @@ function binddump_expand_zone_record(&$record)
 		"[\s,]+/", $record['rdata'], 0, PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE);
 
 	$record['_extended'] = [];
+	$record['_required'] = [];
+	$record['_optional'] = [];
 
 	switch ($record['type']) {
 		case 'MX':
+			$record['_required'] = ['priority', 'host'];
 			if (count($val) == 2) {
 				$record['priority'] = $val[0];
 				$record['host'] = $val[1];
@@ -403,6 +406,7 @@ function binddump_expand_zone_record(&$record)
 			break;
 
 		case 'SRV':
+			$record['_required'] = ['priority', 'weight', 'port', 'host'];
 			if (count($val) == 4) {
 				$record['priority'] = $val[0];
 				$record['weight'] = $val[1];
@@ -412,12 +416,14 @@ function binddump_expand_zone_record(&$record)
 			break;
 
 		case 'NS':
+			$record['_required'] = ['nameserver'];
 			if (count($val) == 1) {
 				$record['nameserver'] = $val[0];
 			}
 			break;
 
 		case 'PTR':
+			$record['_required'] = ['host'];
 			if (count($val) == 1) {
 				$record['ip'] = binddump_ptr_to_ip($record['name']);
 				$record['host'] = $val[0];
@@ -426,7 +432,17 @@ function binddump_expand_zone_record(&$record)
 			break;
 
 		case 'A':
+			$record['_required'] = ['ipv4'];
+			if (count($val) == 1) {
+				$record['ip'] = $val[0];
+				$record['ptr'] = binddump_ip_to_ptr($record['ip']);
+				$record['host'] = $record['name'];
+				$record['_extended'] = ['ptr'];
+			}
+			break;
+
 		case 'AAAA':
+			$record['_required'] = ['ipv6'];
 			if (count($val) == 1) {
 				$record['ip'] = $val[0];
 				$record['ptr'] = binddump_ip_to_ptr($record['ip']);
@@ -437,16 +453,19 @@ function binddump_expand_zone_record(&$record)
 
 		case 'TXT':
 		case 'SPF': //SPF does not realy exist but BIND threats it like TXT
+			$record['_required'] = ['txt'];
 			$record['txt'] = binddump_unescape_dns_string(implode('', binddump_mb_explode_escaped('"', $record['rdata'])));
 			break;
 
 		case 'CNAME':
+			$record['_required'] = ['host'];
 			if (count($val) == 1) {
 				$record['host'] = $val[0];
 			}
 			break;
 
 		case 'SOA':
+			$record['_required'] = ['mname', 'rname', 'serial', 'refresh', 'retry', 'expire', 'minimum'];
 			if (count($val) == 7) {
 				$record['mname'] = $val[0];
 				$record['rname'] = $val[1];
