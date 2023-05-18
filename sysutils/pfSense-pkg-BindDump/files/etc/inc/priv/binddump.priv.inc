@@ -19,11 +19,13 @@
 
 global $priv_list;
 
-$priv_list['page-sysutils-binddumppackage'] = array();
-$priv_list['page-sysutils-binddumppackage']['name'] = "WebCfg - sysutils: binddump package";
-$priv_list['page-sysutils-binddumppackage']['descr'] = "Allow access to binddump package GUI";
+$priv_list['page-sysutils-binddump'] = array();
+$priv_list['page-sysutils-binddump']['name'] = "WebCfg - sysutils: BIND Dump";
+$priv_list['page-sysutils-binddump']['descr'] = "Allow access to BIND Dump GUI";
 
-$priv_list['page-sysutils-binddumppackage']['match'] = array();
-$priv_list['page-sysutils-binddumppackage']['match'][] = "packages/binddump/binddump.php*";
+$priv_list['page-sysutils-binddump']['match'] = array();
+$priv_list['page-sysutils-binddump']['match'][] = "packages/binddump/binddump.php*";
+$priv_list['page-sysutils-binddump']['match'][] = "packages/binddump/zoneEdit.php*";
+$priv_list['page-sysutils-binddump']['match'][] = "packages/binddump/zoneEditor.php*";
 
 ?>
