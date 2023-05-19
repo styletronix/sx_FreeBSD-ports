@@ -1,10 +1,11 @@
 <?php
+use binddump\ZoneParser;
 /*
  * binddump.php
  */
 require_once("guiconfig.inc");
 require_once("config.inc");
-require_once("/usr/local/pkg/binddump.inc");
+require_once("/usr/local/pkg/binddump_zoneparser.inc");
 
 function exists_record_by_Name($entries, $name, $types = ['A', 'AAAA', 'PTR'])
 {
@@ -20,7 +21,7 @@ if ($_REQUEST['loadData']) {
     $entries = null;
 
     try {
-        $entries = binddump_get_rndc_zone_dump_parsed();
+        $entries = ZoneParser::get_rndc_zone_dump_parsed();
     } catch (Exception $e) {
         http_response_code(422);
         header('Content-Type: application/json; charset=UTF-8');
@@ -97,7 +98,7 @@ if ($_REQUEST['download']) {
                 }
                 $file = CHROOT_LOCALBASE . '/etc/namedb/named_dump.db';
 
-                if (!binddump_waitfor_string_in_file($file, "; Dump complete", 30)) {
+                if (!ZoneParser::waitfor_string_in_file($file, "; Dump complete", 30)) {
                     die('Timeout during zone dump');
                 }
                 break;
@@ -134,7 +135,7 @@ if ($_REQUEST['action'] == "delete_host") {
     }
 
     try {
-        $result = binddump_addremove_items_to_zone($item['zonename'], $item['view'], [], [$item]);
+        $result = ZoneParser::addremove_items_to_zone($item['zonename'], $item['view'], [], [$item]);
     } catch (Exception $e) {
         print("[Exception] ");
         print($e->getMessage());
@@ -164,7 +165,7 @@ if ($_REQUEST['action'] == "add_host") {
         return;
     }
     try {
-        $result = binddump_addremove_items_to_zone($item['zone'], $item['view'], [$item], []);
+        $result = ZoneParser::addremove_items_to_zone($item['zone'], $item['view'], [$item], []);
     } catch (Exception $e) {
         print("[Exception] ");
         print($e->getMessage());
@@ -187,7 +188,7 @@ include("head.inc");
 if ($input_errors) {
     print_input_errors($input_errors);
 }
-$zonelist = binddump_get_zonelist();
+$zonelist = ZoneParser::get_zonelist();
 
 $tab_array = array();
 $tab_array[] = array(gettext("Show all Zones"), true, "/packages/binddump/binddump.php");
@@ -257,8 +258,8 @@ display_top_tabs($tab_array);
                             <?= gettext("All Zones") ?>
                         </option>
                         <?php foreach ($zonelist as $zone): ?>
-                            <option value="<?= htmlspecialchars(binddump_reverse_zonename($zone) . '.') ?>">
-                                <?= htmlspecialchars(binddump_reverse_zonename($zone) . '. (' . $zone['type'] . ')') ?>
+                            <option value="<?= htmlspecialchars(ZoneParser::reverse_zonename($zone) . '.') ?>">
+                                <?= htmlspecialchars(ZoneParser::reverse_zonename($zone) . '. (' . $zone['type'] . ')') ?>
                             </option>
                         <?php endforeach; ?>
                     </select>

@@ -1,10 +1,11 @@
 <?php
+use binddump\ZoneParser;
 /*
  * binddump.php
  */
 require_once("guiconfig.inc");
 require_once("config.inc");
-require_once("/usr/local/pkg/binddump.inc");
+require_once("/usr/local/pkg/binddump_zoneparser.inc");
 
 define('BIND_LOCALBASE', '/usr/local');
 define('CHROOT_LOCALBASE', '/var/etc/named');
@@ -104,7 +105,7 @@ if ($_POST) {
 
     if ($loadZone === true) {
         try {
-            $post['zone_data'] = binddump_compilezone($zoneview, $zonename_reverse);
+            $post['zone_data'] = ZoneParser::compilezone($zoneview, $zonename_reverse);
             $savemsg[] = "Zone Data loaded.";
         } catch (Exception $e) {
             $post['zone_data'] = '';
@@ -126,9 +127,9 @@ $tab_array[] = array(gettext("Edit Zone File"), false, "/packages/binddump/zoneE
 display_top_tabs($tab_array);
 
 $zonelist = [];
-foreach (binddump_get_zonelist() as $zone) {
+foreach (ZoneParser::get_zonelist() as $zone) {
     if ($zone['type'] == 'master') {
-        $zonelist[$zone['view'] . '__' . $zone['name'] . '__' . binddump_reverse_zonename($zone) . '__' . $zone['type']] = binddump_reverse_zonename($zone) . '  (' . $zone['view'] . ')';
+        $zonelist[$zone['view'] . '__' . $zone['name'] . '__' . ZoneParser::reverse_zonename($zone) . '__' . $zone['type']] = ZoneParser::reverse_zonename($zone) . '  (' . $zone['view'] . ')';
     }
 }
 ksort($zonelist);

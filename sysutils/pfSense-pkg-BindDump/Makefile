@@ -31,11 +31,12 @@ do-install:
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/binddump.xml ${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/binddump.xml ${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/binddump.inc ${STAGEDIR}${PREFIX}/pkg
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/binddump_zoneparser.inc ${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${FILESDIR}/etc/inc/priv/binddump.priv.inc ${STAGEDIR}/etc/inc/priv
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/packages/binddump/binddump.php ${STAGEDIR}${PREFIX}/www/packages/binddump
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/packages/binddump/binddump.js ${STAGEDIR}${PREFIX}/www/packages/binddump
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/packages/binddump/zoneEdit.php ${STAGEDIR}${PREFIX}/www/packages/binddump
-	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/packages/binddump/index.php ${STAGEDIR}${PREFIX}/www/packages/binddump
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/packages/binddump/zoneEditor.php ${STAGEDIR}${PREFIX}/www/packages/binddump
 	${INSTALL_DATA} ${FILESDIR}${DATADIR}/info.xml ${STAGEDIR}${DATADIR}
 	
 	@${REINPLACE_CMD} -i '' -e "s|%%PKGVERSION%%|${PKGVERSION}|" \

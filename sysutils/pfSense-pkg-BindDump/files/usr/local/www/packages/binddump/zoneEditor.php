@@ -1,10 +1,11 @@
 <?php
+use binddump\ZoneParser;
 /*
  * binddump.php
  */
 require_once("guiconfig.inc");
 require_once("config.inc");
-require_once("/usr/local/pkg/binddump.inc");
+require_once("/usr/local/pkg/binddump_zoneparser.inc");
 
 define('BIND_LOCALBASE', '/usr/local');
 define('CHROOT_LOCALBASE', '/var/etc/named');
@@ -27,13 +28,13 @@ if ($_POST) {
             $zonename_reverse = $selectedZone[2];
             $zonetype = $selectedZone[3];
 
-            $zone_data = binddump_compilezone($zoneview, $zonename_reverse, $zonetype);
-            $zone_data_parsed = binddump_parse_rndc_zone_dump($zone_data, $zonename_reverse, false);
+            $zone_data = ZoneParser::compilezone($zoneview, $zonename_reverse, $zonetype);
+            $zone_data_parsed = ZoneParser::parse_rndc_zone_dump($zone_data, $zonename_reverse, false);
             foreach ($zone_data_parsed as &$data) {
                 foreach ($bindzone as $zone) {
                     if ($zone['view'] == $zoneview && $zone['name'] == $zonename) {
                         $customzonerecords = base64_decode($zone['customzonerecords']);
-                        $customzonerecords_parsed = binddump_parse_rndc_zone_dump($customzonerecords, $zonename_reverse, false);
+                        $customzonerecords_parsed = ZoneParser::parse_rndc_zone_dump($customzonerecords, $zonename_reverse, false);
                         foreach ($customzonerecords_parsed as $customzonerecord) {
                             if (
                                 $customzonerecord['name'] == $data['name']
@@ -76,9 +77,9 @@ if ($_POST) {
 
     if ($loadZone) {
         try {
-            $post['zone_data'] = binddump_compilezone($zoneview, $zonename_reverse);
+            $post['zone_data'] = ZoneParser::compilezone($zoneview, $zonename_reverse);
         } catch (Exception $e) {
-            $zrev = binddump_re_reverse_zonename($zonename_reverse);
+            $zrev = ZoneParser::re_reverse_zonename($zonename_reverse);
             $post['zone_data'] = $zrev; //'[error]';
             $input_errors[] = $e->getMessage();
             unset($_POST["save"]);
@@ -147,7 +148,7 @@ if ($_POST) {
             $input_errors[] = "named-checkzone throwed an exception. Code {$resultCode} \n " . implode("\n", $output);
         } else {
             try {
-                $post['zone_data'] = binddump_compilezone($zoneview, $zonename_reverse);
+                $post['zone_data'] = ZoneParser::compilezone($zoneview, $zonename_reverse);
                 $post['zone_editable'] = "true";
             } catch (Exception $e) {
                 $post['zone_data'] = '[error]';
@@ -161,7 +162,7 @@ if ($_POST) {
 }
 
 if ($post['zone_data']) {
-    $zone_data_parsed = binddump_parse_rndc_zone_dump($post['zone_data'], $zonename_reverse, false);
+    $zone_data_parsed = ZoneParser::parse_rndc_zone_dump($post['zone_data'], $zonename_reverse, false);
 } else {
     $zone_data_parsed = [];
 }
@@ -178,9 +179,9 @@ $tab_array[] = array(gettext("Edit Zone File"), true, "/packages/binddump/zoneEd
 display_top_tabs($tab_array);
 
 $zonelist = [];
-foreach (binddump_get_zonelist() as $zone) {
+foreach (ZoneParser::get_zonelist() as $zone) {
     if ($zone['type'] == 'master') {
-        $zonelist[$zone['view'] . '__' . $zone['name'] . '__' . binddump_reverse_zonename($zone) . '__' . $zone['type']] = binddump_reverse_zonename($zone) . '  (' . $zone['view'] . ')';
+        $zonelist[$zone['view'] . '__' . $zone['name'] . '__' . ZoneParser::reverse_zonename($zone) . '__' . $zone['type']] = ZoneParser::reverse_zonename($zone) . '  (' . $zone['view'] . ')';
     }
 }
 ksort($zonelist);
