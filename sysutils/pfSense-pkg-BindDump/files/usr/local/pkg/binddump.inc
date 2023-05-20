@@ -24,11 +24,6 @@ require_once("/usr/local/pkg/binddump_zoneparser.inc");
 
 function binddump_sync_package()
 {
-	configure_binddump();
-}
-
-function binddump_configure_binddump()
-{
 	// nothing to do right now.
 }
 ?>

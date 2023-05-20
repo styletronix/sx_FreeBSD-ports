@@ -1,5 +1,6 @@
 <?php
 use binddump\ZoneParser;
+
 /*
  * binddump.php
  */
@@ -12,6 +13,7 @@ define('CHROOT_LOCALBASE', '/var/etc/named');
 $rndc_conf_path = BIND_LOCALBASE . "/etc/rndc.conf";
 $rndc = "/usr/local/sbin/rndc -q -c {$rndc_conf_path}";
 $chkzone = '/usr/local/sbin/named-checkzone';
+
 
 
 if ($_POST) {
@@ -37,6 +39,20 @@ if ($_POST) {
     $zonename_reverse = $selectedZone[2];
     $zonetype = $selectedZone[3];
 
+    if ($post["action"] == "download_zonefile") {
+        if (!empty($selectedZone)) {
+            $zonedb = ZoneParser::compilezone($zoneview, $zonename_reverse);
+            header('Content-Type: text/plain');
+            header('Content-Disposition: attachment; filename="' . $zonename . '_' . $zoneview . '.txt"');
+            header('Cache-Control: no-cache');
+            header('Content-Length: ' . strlen($zonedb));
+            print($zonedb);
+            exit;
+        } else {
+            $input_errors[] = gettext('No Zone selected.');
+        }
+    }
+
     if ($post["action"] == 'save') {
         $tempDB = tempnam("/tmp", "validate_zone");
         file_put_contents($tempDB, $post['zone_data']);
@@ -56,7 +72,7 @@ if ($_POST) {
             $savemsg[] = "Zonedata saved.";
             array_merge($savemsg, $output);
         } else {
-            $input_errors[] = "Validation of new Zonefile failed. Code {$resultCode}";
+            $input_errors[] = gettext("Validation of new Zonefile failed.") . " Code {$resultCode}";
             array_merge($input_errors, $output);
             $loadZone = false;
         }
@@ -103,10 +119,14 @@ if ($_POST) {
         }
     }
 
+    if ($post['action'] == 'db_to_config') {
+        $zone_parsed = ZoneParser::parse_rndc_zone_dump($post['zone_data'], $zonename_reverse, false);
+    }
+
     if ($loadZone === true) {
         try {
             $post['zone_data'] = ZoneParser::compilezone($zoneview, $zonename_reverse);
-            $savemsg[] = "Zone Data loaded.";
+            $savemsg[] = gettext("Zone Data loaded.");
         } catch (Exception $e) {
             $post['zone_data'] = '';
             $post['zone_editable'] = "false";
@@ -165,8 +185,8 @@ if (!empty($savemsg)) {
                         </option>
                         <? foreach ($zonelist as $key => $value) { ?>
                             <option <? if ($key == $post['current_zone']) {
-                                    print('selected="selected"');
-                                } ?> value="<?= $key ?>"><?= $value ?>
+                                print('selected="selected"');
+                            } ?> value="<?= $key ?>"><?= $value ?>
                             </option>
                         <? } ?>
                     </select>
@@ -179,18 +199,23 @@ if (!empty($savemsg)) {
                     </span>
                 </label>
                 <div class="col-sm-10 btn-group">
-
                     <button class="btn btn-default" type="submit" value="freeze" name="action">
-                        <?= gettext('Start Edit-Mode') ?>
+                        <i class="fa fa-edit icon-embed-btn"></i>
+                        <?= gettext('Start edit') ?>
                     </button>
                     <button class="btn btn-success" type="submit" value="save" name="action">
+                        <i class="fa fa-download icon-embed-btn"></i>
                         <?= gettext('Save changes') ?>
                     </button>
                     <button class="btn btn-default" type="submit" value="thaw" name="action">
-                        <?= gettext('End Edit-Mode') ?>
+                        <?= gettext('Cancel edit') ?>
                     </button>
                     <button class="btn btn-default" type="submit" value="thawall" name="action">
-                        <?= gettext('End Edit-Mode (All Zones)') ?>
+                        <?= gettext('Cancel edit (All Zones)') ?>
+                    </button>
+                    <button class="btn btn-default" type="submit" value="download_zonefile" name="action">
+                        <i class="fa fa-download icon-embed-btn"></i>
+                        <?= gettext('Download Zone DB') ?>
                     </button>
                 </div>
             </div>
@@ -213,13 +238,177 @@ if (!empty($savemsg)) {
             <textarea rows="10" class="col-sm-12 form-control" name="zone_data" id="zone_data" wrap="off" <? if ($post['zone_editable'] !== 'true') {
                 print('readonly="readonly"');
             } ?>><?= $post['zone_data'] ?></textarea>
+            <div class="col-sm-12 btn-group">
+                <button class="btn btn-success" type="submit" value="save" name="action">
+                    <?= gettext('Save changes / End Edit-Mode') ?>
+                </button>
+                <button class="btn btn-default" type="submit" value="db_to_config" name="action">
+                    <?= gettext('Zone File to XML Config...') ?>
+                </button>
+            </div>
         </div>
     </div>
-    <div class="col-sm-10 col-sm-offset-2">
-        <button class="btn btn-success" type="submit" value="save" name="action"><?= gettext('Save changes / End Edit-Mode') ?>
-        </button>
+
+    <? if (!empty($zone_parsed)) {
+        $skip = ['name_part1', 'name_part2', 'index', 'class', 'name', 'type'];
+        ?>
+
+        <div class="panel panel-default">
+            <div class="panel-heading">
+                <h2 class="panel-title">
+                    <?= gettext('Zone Records') ?>
+                </h2>
+            </div>
+            <div class="table-responsive">
+                <input type="checkbox">Show Advanced Values.</input>
+                <table id="zonerecordlist" class="table table-striped table-hover table-condensed sortable-theme-bootstrap"
+                    data-sortable>
+                    <thead>
+                        <tr>
+                            <th>
+                                <?= gettext("Name") ?>
+                            </th>
+                            <th>
+                                <?= gettext("Type") ?>
+                            </th>
+                            <th>
+                                <?= gettext("Values") ?>
+                            </th>
+                            <th>
+                                <?= gettext("in config") ?>
+                            </th>
+                            <th>
+                                <?= gettext("Action") ?>
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr data-template-row="edit" style="display: none;">
+                            <td data-fieldname="name"></td>
+                            <td>
+                                <select data-fieldname="type">
+                                    <option value="A">A</option>
+                                    <option value="AAAA">AAAA</option>
+                                    <option value="TXT">TXT</option>
+                                    <option value="SPF">SPF</option>
+                                    <option value="MX">MX</option>
+                                    <option value="NS">NS</option>
+                                    <option value="SOA">SOA</option>
+                                    <option value="CNAME">CNAME</option>
+                                    <option value="PTR">PTR</option>
+                                    <option value="SRV">SRV</option>
+                                    <option value="DCHID">DCHID</option>
+                                    <option value="CERT">CERT</option>
+                                    <option value="DNSKEY">DNSKEY</option>
+                                    <option value="RRSIG">RRSIG</option>
+                                    <option value="CDNSKEY">CDNSKEY</option>
+                                    <option value="NSEC">NSEC</option>
+                                    <option value="TA">TA</option>
+                                    <option value="IPSECKEY">IPSECKEY</option>
+                                    <option value="KEY">KEY</option>
+                                    <option value="DNAME">DNAME</option>
+                                    <option value="AFSDB">AFSDB</option>
+                                    <option value="APL">APL</option>
+                                    <option value="CAA">CAA</option>
+                                    <option value="CDS">CDS</option>
+                                    <option value="CSYNC">CSYNC</option>
+                                    <option value="DLV">DLV</option>
+                                    <option value="DS">DS</option>
+                                    <option value="EUI48">EUI48</option>
+                                    <option value="EUI64">EUI64</option>
+                                    <option value="HINFO">HINFO</option>
+                                    <option value="HIP">HIP</option>
+                                    <option value="HTTPS">HTTPS</option>
+                                    <option value="KX">KX</option>
+                                    <option value="NAPTR">NAPTR</option>
+                                    <option value="LOC">LOC</option>
+                                    <option value="OPENPGPKEY">OPENPGPKEY</option>
+                                    <option value="NSEC3">NSEC3</option>
+                                    <option value="NSEC3PARAM">NSEC3PARAM</option>
+                                    <option value="RP">RP</option>
+                                    <option value="SIG">SIG</option>
+                                    <option value="SMIMEA">SMIMEA</option>
+                                    <option value="SSHFP">SSHFP</option>
+                                    <option value="SVCB">SVCB</option>
+                                    <option value="TKEY">TKEY</option>
+                                    <option value="TSIG">TSIG</option>
+                                    <option value="TLSA">TLSA</option>
+                                    <option value="ZONEMD">ZONEMD</option>
+                                    <option value="URI">URI</option>
+                                    <option value="AXFR">AXFR</option>
+                                    <option IXFR="TLSA">IXFR</option>
+                                </select>
+                            </td>
+                            <td>
+                                <input data-fieldname="priority" type="number" />
+                                <input data-fieldname="hostname" type="mailserver" />
+                                <input data-fieldname="ip" type="text" />
+                                <input data-fieldname="rdata" type="text" />
+                            </td>
+                            <td>
+                                <input data-fieldname="_inconfig" type="checkbox" />
+                            </td>
+                        </tr>
+                        <? foreach ($zone_parsed as $record) { ?>
+                            <tr data-name="<?= $record['name'] ?>" data-id="<?= $record['_id'] ?>"
+                                data-rdata="<?= $record['rdata'] ?>">
+                                <td>
+                                    <b>
+                                        <?= htmlspecialchars($record['name_part1']) ?>
+                                    </b>
+                                    <?= htmlspecialchars($record['name_part2']) ?>
+                                </td>
+                                <td>
+                                    <?= htmlspecialchars($record['type']) ?>
+                                </td>
+                                <td>
+                                    <?
+                                    $sortKeys =array_unique(array_merge($record['_required'], array_keys($record)));
+                                    foreach ($sortKeys as $key) {
+                                        if (!str_starts_with($key, '_') && !in_array($key, $skip)) {
+                                            $icon = '';
+                                            $requiredKey = $record['_required'] && in_array($key, $record['_required']);
+                                            $val = $record[$key];
+
+                                            if ($requiredKey) {
+                                                $textclass = 'text-warning';
+                                            }else{
+                                                $textclass = 'text-success';
+                                            }
+
+                                            switch($key){
+                                                case 'host':
+                                                case 'ptr':
+                                                case 'mname':
+                                                case 'nameserver':
+                                                            if (ZoneParser::record_exists_by_name($zone_parsed, $val)) {
+                                                                $icon = '<i class="fa fa-check"></i>';
+                                                            }
+                                                default:
+                                            }
+
+                                            print("<div data-required=\"" . ($requiredKey ? "true" : "false" ). "\"><span class=\"text-uppercase {$textclass}\">" . htmlspecialchars($key) . ': </span>' . htmlspecialchars($val) . $icon . '</div>');
+                                        }
+                                    }
+                                    ?>
+                                </td>
+                                <td>
+                                    <?= $record['_inconfig'] ?>
+                                </td>
+                                <td></td>
+                            </tr>
+                        <? } ?>
+                    </tbody>
+                </table>
+                <div class="col-sm-10 col-sm-offset-2">
+                    <button class="btn btn-primary" type="button" value="add_record" name='action'><i
+                            class="fa fa-add icon-embed-btn"> </i>
+                        <?= gettext('Add') ?>
+                    </button>
+                </div>
+            </div>
         </div>
-    </div>
+    <? } ?>
 
     <div id="dlg_updatestatus" class="modal fade" role="dialog" aria-labelledby="dlg_updatestatus" aria-hidden="true">
         <div class="modal-dialog modal-lg">
