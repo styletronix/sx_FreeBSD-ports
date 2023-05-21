@@ -80,11 +80,42 @@ namespace binddump {
             'AXFR',
             'TLSA'
         ];
+        const PATH_CHECKZONE = '/usr/local/sbin/named-checkzone';
 
+
+        /**
+         * Validates and writes data to the zonefile.
+         * @param string $data  Data to be stored in the zone file as string.
+         * @param string $zonetype  Zonetype [master|slave]
+         * @param string $zoneview   Zoneview
+         * @param string $fullzonename   The full zone name including ...arpa for reverse zones if applicable.
+         * @return array result_code = resultode from checkzone. message = resultmessage. success = true if successfull.
+         */
+        public static function validate_save_zonefile(string $data, string $zonetype, string $zoneview, string $fullzonename)
+        {
+            $fullzonename = rtrim($fullzonename, '.');
+            $zonename = self::re_reverse_zonename($fullzonename);
+            $tempDB = tempnam("/tmp", "validate_zone");
+            file_put_contents($tempDB, $data);
+
+            // validate and save to DB if successfull.
+            exec(self::PATH_CHECKZONE . ' -F text ' .
+                '-o ' . escapeshellarg(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{ $zonename}.DB") . ' ' .
+                escapeshellarg($fullzonename) . ' ' .
+                escapeshellarg($tempDB) . ' 2>&1', $output, $resultCode);
+
+            unlink($tempDB);
+
+            return [
+                'result_code' => $resultCode,
+                'message' => implode("\n", $output),
+                'success' => ($resultCode == 0 ? true : false)
+            ];
+        }
         public static function get_rndc_zone_dump_parsed()
         {
             $rndc_conf_path = BIND_LOCALBASE . "/etc/rndc.conf";
-            $rndc = "/usr/local/sbin/rndc -q -r -c " . $rndc_conf_path;
+            $rndc = "/usr/local/sbin/rndc -q -r -c " . escapeshellarg($rndc_conf_path) . ' ';
 
             $output = null;
             $retval = null;
@@ -92,12 +123,14 @@ namespace binddump {
             $lock = lock("named_dump");
             try {
                 // Make sure the zone file is recent.
-                exec("{$rndc} sync -clean ");
+                exec("{$rndc} sync -clean " . ' 2>&1', $output, $retval);
+
                 // Dump all zone data to file
                 exec("{$rndc} dumpdb -zones" . ' 2>&1', $output, $retval);
                 if ($retval !== 0) {
                     throw new \Exception('Exception during zone compiling. Code:' . $retval . "\n" . implode("\n", $output));
                 }
+
                 $dumpFile = CHROOT_LOCALBASE . '/etc/namedb/named_dump.db';
 
                 if (self::waitfor_string_in_file($dumpFile, "; Dump complete", 30)) {
@@ -113,7 +146,7 @@ namespace binddump {
         /**
          * Compiles the Bind DNS Zone to a human readable and parseable string.
          * @param string $view View of the Zone
-         * @param string $zone Zone name
+         * @param string $zone The full zone name
          * @param string $type Optional Zone-Type. default 'master'
          * @throws \Exception Throws an exception if failed.
          * @return string Returns parsed and normalized zone DB as string.
@@ -146,7 +179,7 @@ namespace binddump {
         public static function addremove_items_to_zone($zone, $view, $items_add, $items_remove, $type = 'master')
         {
             $rndc_conf_path = BIND_LOCALBASE . "/etc/rndc.conf";
-            $rndc = "/usr/local/sbin/rndc -q -r -c " . $rndc_conf_path;
+            $rndc = "/usr/local/sbin/rndc -q -r -c " . escapeshellarg($rndc_conf_path) . ' ';
 
             if (str_ends_with($view, ' (signed)')) {
                 // Signed DB and unsigned DB will automatically sync when serial is increased
@@ -214,7 +247,8 @@ namespace binddump {
 
         /* Parse files created with RNDC dumpdb -zones
               parse the zone file which was exported with "named-compilezone -F text" or "RNDC dumpdb -zones" */
-        public static function parse_rndc_zone_dump($value, $zone = '', $include_comment_only = false){
+        public static function parse_rndc_zone_dump($value, $zone = '', $include_comment_only = false)
+        {
             $reg_host = "{(?<name>.+?)?(?:\s+?(?<ttl>\d*))?\s+(?<class>IN)?\s+(?<type>\p{L}+)\s+(?<rdata>.*)}";
             $regzone = "{;.+?\'(?<zone>.+?)\/.+/(?<view>.*)\'}";
             $zone_data_parsed = [];
@@ -353,13 +387,13 @@ namespace binddump {
 
                         // split host. only for display
                         $record['name_part1'] = $record['name'];
-                        $a = strripos($record['name'], ".{$origin}.");
-                        if (strtolower($record['name']) == strtolower("{$origin}.")) {
+                        $a = strripos($record['name'], ".{$zone}");
+                        if (strtolower($record['name']) == strtolower("{$zone}")) {
                             $record['name_part1'] = $record['name'];
                             $record['name_part2'] = '';
                         } elseif ($a > 0) {
                             $record['name_part1'] = substr($record['name'], 0, $a);
-                            $record['name_part2'] = ".{$origin}.";
+                            $record['name_part2'] = ".{$zone}";
                         }
 
                         $record['_id'] = self::get_record_id($record);
@@ -632,23 +666,31 @@ namespace binddump {
             }
         }
 
-        // read and parse current zone db
-        public static function get_zone_dump_parsed($zonetype, $zoneview, $zonename, $zonename_reverse)
+        /**
+         * Returns the Zone Data as an array of objects.
+         * @param string $zonetype
+         * @param string $zoneview
+         * @param string $zonename The full zonename.
+         * @return array|null
+         */
+        public static function get_zone_dump_parsed($zonetype, $zoneview, $zonename, )
         {
             $rndc_conf_path = BIND_LOCALBASE . "/etc/rndc.conf";
-            $rndc = "/usr/local/sbin/rndc -q -r -c " . $rndc_conf_path;
+            $rndc = "/usr/local/sbin/rndc -q -r -c " . escapeshellarg($rndc_conf_path). ' ';
 
-            $temp_zone_file = "/tmp/nameddump_{$zonetype}_{$zoneview}_{$zonename}.txt";
-            $zonefile = CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB";
+            $zonename_reverse = self::re_reverse_zonename($zonename);
+
+            $temp_zone_file = "/tmp/nameddump_{$zonetype}_{$zoneview}_{$zonename_reverse}.txt";
+            $zonefile = CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename_reverse}.DB";
             $current_zone_data_parsed = null;
 
             // Make sure the zone file is recent.
-            exec("{$rndc} sync -clean " . escapeshellarg($zonename_reverse) . " IN " . escapeshellarg($zoneview));
+            exec("{$rndc} sync -clean " . escapeshellarg($zonename) . " IN " . escapeshellarg($zoneview));
 
-            
+
             exec('/usr/local/sbin/named-compilezone -F text -i none -s full ' .
                 ' -o ' . escapeshellarg($temp_zone_file) . ' ' .
-                escapeshellarg($zonename_reverse) . ' ' .
+                escapeshellarg($zonename) . ' ' .
                 escapeshellarg($zonefile) . ' 2>&1', $output, $resultCode);
 
             if ($resultCode == 0) {
@@ -729,6 +771,12 @@ namespace binddump {
             return $diff;
         }
 
+        /** 
+         * Changes the serial in the given zone config.
+         * @param string $zone_conf The content of the zone DB.
+         * @param string $new_zoneserial New Serial to set
+         * @return string The new zone DB as string.
+         */
         public static function set_serial_zoneconf($zone_conf, $new_zoneserial)
         {
             // write new serial to zone_conf.
@@ -773,6 +821,11 @@ namespace binddump {
             throw new \Exception('Timeout while waiting for end of file');
         }
 
+
+        /**
+         * Reads the ZoneList from the bindzone config in pfSense config file.
+         * Sorted alphabetically 
+         */
         public static function get_zonelist()
         {
             global $config;
@@ -787,6 +840,9 @@ namespace binddump {
             return $bindzone;
         }
 
+        /** 
+         * Returns the simple zone name by removing .ip6.arpa or .in-addr.arpa from the string.
+         */
         public static function re_reverse_zonename($name)
         {
             if (str_ends_with($name, '.ip6.arpa')) {
@@ -803,6 +859,13 @@ namespace binddump {
             }
             return $name;
         }
+
+        /** 
+         * Returns the zone name including ipv6.arpa or in-addr.arpa if required. Otherwise it returns the plain zone name.
+         * 
+         * @param mixed $zone A single zone from get_zonelist()
+         * @return string Returns the full zone name.
+         */
         public static function reverse_zonename($zone)
         {
             if ($zone['reverso'] == "on") {
