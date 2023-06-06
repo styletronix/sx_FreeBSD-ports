@@ -5,7 +5,7 @@
 	<copyright>
 <![CDATA[
 /*
- * bind.xml
+ * sxbind.xml
  *
  * part of pfSense (https://www.pfsense.org)
  * Copyright (c) 2015-2023 Rubicon Communications, LLC (Netgate)
@@ -28,44 +28,48 @@
  */
 	]]>
 	</copyright>
-	<name>bind</name>
+	<name>sxbind</name>
 	<version>%%PKGVERSION%%</version>
-	<title>Services/Bind</title>
-	<include_file>/usr/local/pkg/bind.inc</include_file>
+	<title>Services/sxbind</title>
+	<include_file>/usr/local/pkg/sxbind.inc</include_file>
 	<menu>
-		<name>BIND DNS Server</name>
-		<tooltiptext>Modify BIND settings</tooltiptext>
+		<name>sxbind DNS Server</name>
+		<tooltiptext>Modify sxbind settings</tooltiptext>
 		<section>Services</section>
-		<url>/pkg_edit.php?xml=bind.xml</url>
+		<url>/pkg_edit.php?xml=sxbind.xml</url>
 	</menu>
 	<service>
 		<name>named</name>
 		<rcfile>named.sh</rcfile>
 		<executable>named</executable>
-		<description>Bind Domain Name Service</description>
+		<description>sxbind Domain Name Service</description>
 		<starts_on_sync></starts_on_sync>
 	</service>
 	<tabs>
 		<tab>
 			<text>Settings</text>
-			<url>/pkg_edit.php?xml=bind.xml</url>
+			<url>/pkg_edit.php?xml=sxbind.xml</url>
 			<active/>
 		</tab>
 		<tab>
 			<text>ACLs</text>
-			<url>/pkg.php?xml=bind_acls.xml</url>
+			<url>/pkg.php?xml=sxbind_acls.xml</url>
 		</tab>
 		<tab>
 			<text>Views</text>
-			<url>/pkg.php?xml=bind_views.xml</url>
+			<url>/pkg.php?xml=sxbind_views.xml</url>
 		</tab>
 		<tab>
 			<text>Zones</text>
-			<url>/pkg.php?xml=bind_zones.xml</url>
+			<url>/pkg.php?xml=sxbind_zones.xml</url>
 		</tab>
 		<tab>
 			<text>Sync</text>
-			<url>/pkg_edit.php?xml=bind_sync.xml</url>
+			<url>/pkg_edit.php?xml=sxbind_sync.xml</url>
+		</tab>
+		<tab>
+			<text>Tools</text>
+			<url>/sxbind_tools.php</url>
 		</tab>
 
 	</tabs>
@@ -76,7 +80,7 @@
 			<name>Daemon Settings</name>
 		</field>
 		<field>
-			<fielddescr>Enable BIND</fielddescr>
+			<fielddescr>Enable sxbind</fielddescr>
 			<fieldname>enable_bind</fieldname>
 			<description>Enable BIND DNS server.</description>
 			<sethelp>
@@ -383,9 +387,9 @@
 		</field>
 	</fields>
 	<custom_php_resync_config_command>
-		bind_sync();
+		sxbind_sync();
 	</custom_php_resync_config_command>
 	<custom_php_install_command>
-		bind_write_rcfile();
+		sxbind_write_rcfile();
 	</custom_php_install_command>
 </packagegui>

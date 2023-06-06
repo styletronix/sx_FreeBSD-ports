@@ -1,0 +1,13 @@
+/etc/inc/priv/sxbind.priv.inc
+pkg/sxbind.inc
+pkg/sxbind.xml
+pkg/sxbind_acls.xml
+pkg/sxbind_sync.xml
+pkg/sxbind_views.xml
+pkg/sxbind_zones.xml
+pkg/sxbind_zoneparser.inc
+%%DATADIR%%/info.xml
+www/shortcuts/pkg_sxbind.inc
+www/widgets/widgets/sxbind.widget.php
+@dir /etc/inc/priv
+@dir /etc/inc

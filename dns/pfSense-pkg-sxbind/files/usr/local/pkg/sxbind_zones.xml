@@ -5,7 +5,7 @@
 	<copyright>
 <![CDATA[
 /*
- * bind_zones.xml
+ * sxbind_zones.xml
  *
  * part of pfSense (https://www.pfsense.org)
  * Copyright (c) 2015-2023 Rubicon Communications, LLC (Netgate)
@@ -27,31 +27,31 @@
  */
 	]]>
 	</copyright>
-	<name>bind_zone</name>
+	<name>sxbind_zone</name>
 	<version>%%PKGVERSION%%</version>
-	<title>Services/Bind</title>
-	<include_file>/usr/local/pkg/bind.inc</include_file>
+	<title>Services/sxbind</title>
+	<include_file>/usr/local/pkg/sxbind.inc</include_file>
 	<tabs>
 		<tab>
 			<text>Settings</text>
-			<url>/pkg_edit.php?xml=bind.xml</url>
+			<url>/pkg_edit.php?xml=sxbind.xml</url>
 		</tab>
 		<tab>
 			<text>ACLs</text>
-			<url>/pkg.php?xml=bind_acls.xml</url>
+			<url>/pkg.php?xml=sxbind_acls.xml</url>
 		</tab>
 		<tab>
 			<text>Views</text>
-			<url>/pkg.php?xml=bind_views.xml</url>
+			<url>/pkg.php?xml=sxbind_views.xml</url>
 		</tab>
 		<tab>
 			<text>Zones</text>
-			<url>/pkg.php?xml=bind_zones.xml&amp;id=0</url>
+			<url>/pkg.php?xml=sxbind_zones.xml&amp;id=0</url>
 			<active/>
 		</tab>
 		<tab>
 			<text>Sync</text>
-			<url>/pkg_edit.php?xml=bind_sync.xml</url>
+			<url>/pkg_edit.php?xml=sxbind_sync.xml</url>
 		</tab>
 	</tabs>
 	<adddeleteeditpagefields>
@@ -92,7 +92,7 @@
 		<field>
 			<fielddescr>Disable This Zone</fielddescr>
 			<fieldname>disabled</fieldname>
-			<description>Do not include this zone in BIND config files.</description>
+			<description>Do not include this zone in sxbind config files.</description>
 			<type>checkbox</type>
 		</field>
 		<field>
@@ -133,7 +133,7 @@
 			<fieldname>view</fieldname>
 			<description>Select (CTRL+click) the views that this zone will belong to.</description>
 			<type>select_source</type>
-			<source><![CDATA[$config['installedpackages']['bindviews']['config']]]></source>
+			<source><![CDATA[$config['installedpackages']['sxbindviews']['config']]]></source>
 			<source_name>name</source_name>
 			<source_value>name</source_value>
 			<multiple/>
@@ -305,7 +305,7 @@
 				]]>
 			</description>
 			<type>select_source</type>
-			<source><![CDATA[$config['installedpackages']['bindacls']['config']]]></source>
+			<source><![CDATA[$config['installedpackages']['sxbindacls']['config']]]></source>
 			<source_name>name</source_name>
 			<source_value>name</source_value>
 			<multiple/>
@@ -345,7 +345,7 @@
 				]]>
 			</description>
 			<type>select_source</type>
-			<source><![CDATA[$config['installedpackages']['bindacls']['config']]]></source>
+			<source><![CDATA[$config['installedpackages']['sxbindacls']['config']]]></source>
 			<source_name>name</source_name>
 			<source_value>name</source_value>
 			<multiple/>
@@ -367,7 +367,7 @@
 				]]>
 			</description>
 			<type>select_source</type>
-			<source><![CDATA[$config['installedpackages']['bindacls']['config']]]></source>
+			<source><![CDATA[$config['installedpackages']['sxbindacls']['config']]]></source>
 			<source_name>name</source_name>
 			<source_value>name</source_value>
 			<multiple/>
@@ -469,7 +469,7 @@
 		<field>
 			<fielddescr></fielddescr>
 			<fieldname>resultconfig</fieldname>
-			<description>Resulting BIND config file for this zone.</description>
+			<description>Resulting sxbind config file for this zone.</description>
 			<type>textarea</type>
 			<cols>84</cols>
 			<rows>15</rows>
@@ -478,50 +478,33 @@
 			<usecolspan2/>
 		</field>
 		<field>
-			<name>On config change</name>
+			<name>DEBUG</name>
 			<type>listtopic</type>
 		</field>
 		<field>
-			<fielddescr>Validate Zone</fielddescr>
-			<fieldname>validate_zone</fieldname>
+			<fielddescr>Reset Zone</fielddescr>
+			<fieldname>reset_zone</fieldname>
 			<description>
-				If enabled, NAMED-CHECKZONE is used to validate zone file bevor overwriting existing zone data to prevent downtime of BIND if the zone file is invalid.
-				BIND will use previous zone data until the exception is resolved. Only used for master zones.
-			</description>
-			<type>checkbox</type>
-		</field>
-		<field>
-			<fielddescr>Keep DDNS entries</fielddescr>
-			<fieldname>ddns_merging</fieldname>
-			<description>
-				Master zone with enabled DDNS will be merged into the BIND config file if this option is enabled, otherwise existing zone data will be overwritten with the new config.
-			</description>
-			<type>checkbox</type>
-		</field>
-		<field>
-			<fielddescr>Increment Serial</fielddescr>
-			<fieldname>increment_serial</fieldname>
-			<description>
-				If enabled and config has changed, the serial of the zone will automatically incremented by 1, based on the actual serial of the zone DB.
+				ATTENTION: This option will delete the DB for the current zone durimng the next update. Uso only if DB contains unresolvable errors.
 			</description>
 			<type>checkbox</type>
 		</field>
 	</fields>
 	<custom_php_after_head_command>
-		bind_print_javascript_type_zone();
+		sxbind_print_javascript_type_zone();
 	</custom_php_after_head_command>
 	<custom_php_validation_command>
 		<![CDATA[
 		if ($_POST['type'] == "master" and $_POST['serial'] == "") {
 			$_POST['serial'] = (date("U") + 1000000000);
 		}
-		bind_zone_validate($_POST, $input_errors);
+		sxbind_zone_validate($_POST, $input_errors);
 		]]>
 	</custom_php_validation_command>
 	<custom_delete_php_command>
-		bind_sync();
+		sxbind_sync();
 	</custom_delete_php_command>
 	<custom_php_resync_config_command>
-		bind_sync();
+		sxbind_sync();
 	</custom_php_resync_config_command>
 </packagegui>

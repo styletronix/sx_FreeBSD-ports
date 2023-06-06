@@ -1,6 +1,6 @@
 <?php
 /*
- * pkg_bind.inc
+ * pkg_sxbind.inc
  *
  * part of pfSense (https://www.pfsense.org)
  * Copyright (c) 2015-2023 Rubicon Communications, LLC (Netgate)
@@ -21,10 +21,10 @@
 
 global $shortcuts;
 
-$shortcuts['bind'] = array();
-$shortcuts['bind']['main'] = "pkg_edit.php?xml=bind.xml";
-$shortcuts['bind']['log'] = "status_logs.php?logfile=resolver";
-$shortcuts['bind']['status'] = "status_services.php";
-$shortcuts['bind']['service'] = "named";
+$shortcuts['sxbind'] = array();
+$shortcuts['sxbind']['main'] = "pkg_edit.php?xml=sxbind.xml";
+$shortcuts['sxbind']['log'] = "status_logs.php?logfile=resolver";
+$shortcuts['sxbind']['status'] = "status_services.php";
+$shortcuts['sxbind']['service'] = "named";
 
 ?>

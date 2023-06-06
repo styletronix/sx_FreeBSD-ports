@@ -1,6 +1,6 @@
 <?php
 /*
- * bind.widget.php
+ * sxbind.widget.php
  *
  * part of pfSense (https://www.pfsense.org)
  * Copyright (c) 2015-2023 Rubicon Communications, LLC (Netgate)
@@ -38,7 +38,7 @@ function close_table() {
 
 ?>
 
-<div id="bind">
+<div id="sxbind">
 	<?php
 	$rndc_bin = "/usr/local/sbin/rndc";
 
@@ -57,23 +57,23 @@ function close_table() {
 </div>
 <script type="text/javascript">
 //<![CDATA[
-	function getstatus_bind() {
-		var url = "/widgets/widgets/bind.widget.php";
+	function getstatus_sxbind() {
+		var url = "/widgets/widgets/sxbind.widget.php";
 		var pars = 'getupdatestatus=yes';
 		var myAjax = $.ajax({
 				url: url,
 				type: "get",
 				data: pars,
-				complete: activitycallback_bind
+				complete: activitycallback_sxbind
 			});
 	}
 
-	function activitycallback_bind(transport) {
-		$('bind').innerHTML = transport.responseText;
-		setTimeout('getstatus_bind()', 5000);
+	function activitycallback_sxbind(transport) {
+		$('sxbind').innerHTML = transport.responseText;
+		setTimeout('getstatus_sxbind()', 5000);
 	}
 events.push(function(){
-	getstatus_bind();
+	getstatus_sxbind();
 });
 //]]>
 </script>
