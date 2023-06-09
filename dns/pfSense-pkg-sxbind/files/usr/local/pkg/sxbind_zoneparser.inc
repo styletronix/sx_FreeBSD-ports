@@ -23,10 +23,18 @@
  */
 
 namespace sxbind {
+    require_once("globals.inc");
+    require_once("config.inc");
+    require_once("util.inc");
+    require_once("pfsense-utils.inc");
+    require_once("pkg-utils.inc");
     require_once("/usr/local/pkg/sxbind.inc");
 
     class ZoneParser
     {
+        const BIND_LOCALBASE = '/usr/local';
+        const CHROOT_LOCALBASE = '/var/etc/named';
+        const CONFIGPREFIX = 'sx';
         const RECORDTYPES_EXPANDABLE = ['A', 'AAAA', 'CNAME', 'TXT', 'SPF', 'PTR', 'MX', 'SOA', 'SRV', 'NS'];
         const RECORDTYPES = [
             'A',
@@ -80,10 +88,11 @@ namespace sxbind {
             'AXFR',
             'TLSA'
         ];
-        const PATH_CHECKZONE = '/usr/local/sbin/named-checkzone';
-        const PATH_RNDC_CONF = BIND_LOCALBASE . '/etc/rndc.conf';
+        public static $PATH_CHECKZONE;
+        public static $PATH_COMPILEZONE;
+        const PATH_RNDC_CONF = self::BIND_LOCALBASE . '/etc/rndc.conf';
         const CMD_RNDC = '/usr/local/sbin/rndc -r -c "' . self::PATH_RNDC_CONF . '" ';
-        const PATH_DUMPFILE = CHROOT_LOCALBASE . '/etc/namedb/named_dump.db';
+        const PATH_DUMPFILE = self::CHROOT_LOCALBASE . '/etc/namedb/named_dump.db';
         /**
          * Summary of freeze_zone
          * @param mixed $zoneview  Zoneview
@@ -106,6 +115,7 @@ namespace sxbind {
                 'success' => ($resultCode == 0 ? true : false)
             ];
         }
+
 
         public static function thaw_zone(string $view, string $zonename)
         {
@@ -146,16 +156,38 @@ namespace sxbind {
          */
         public static function save_zonefile(string $data, string $zonetype, string $view, string $zonename)
         {
-            // if ($zonetype != 'master') {
-            //     return [
-            //         'result_code' => 1,
-            //         'message' => 'Only master zones are editable',
-            //         'success' => false
-            //     ];
-            // }
-
+            global $config;
             // Replace all kind of linebreak styles with LF (unix style)
-            $data = preg_replace('~\R~u', "\n", $data);
+            $data = preg_replace('~\R~u', "\n", $data) . "\n";
+            $dataexploded = explode("\n", $data);
+
+            // parse zone data and increment serial
+            $zone_compiled = self::parse_rndc_zone_dump($data, $zonename);
+            foreach ($zone_compiled as $record) {
+                if ($record['type'] == 'SOA') {
+                    $soa_record = $record;
+                    break;
+                }
+            }
+
+            if ($soa_record) {
+                $soa_record['serial']++;
+
+                // combine raw text format of data with parsed soa record
+                $data1 = array_slice($dataexploded, 0, $soa_record['_index']);
+                self::collapse_zone_record($soa_record);
+                $data2 = array_slice($dataexploded, $soa_record['_index'] + $soa_record['_rowcount']);
+
+                $dataMerged = $data1;
+                $dataMerged[] = self::zone_record_to_string($soa_record);
+                $dataMerged = array_merge($dataMerged, $data2);
+
+                $data = implode("\n", $dataMerged);
+                
+                log_error('[bind] Serial has been incremented to ' . $soa_record['serial']);
+            } else {
+                log_error('[bind] Serial in zone data not found!');
+            }
 
             $zonename = rtrim($zonename, '.');
             $rzone = self::re_reverse_zonename($zonename);
@@ -169,10 +201,25 @@ namespace sxbind {
             // validate and save to DB if successfull.
             // Defaut format text for master zones.
             // TODO: detect the zone format. text|raw|raw=|map
-            exec(self::PATH_CHECKZONE . ' -F text ' .
+            exec(self::$PATH_CHECKZONE . ' -F text ' .
                 '-o ' . escapeshellarg(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$view}/{$rzone}.DB") . ' ' .
                 escapeshellarg($zonename) . ' ' .
                 escapeshellarg($tempDB) . ' 2>&1', $output, $resultCode);
+
+            if ($resultCode == 0) {
+                if (is_array($config['installedpackages'][self::CONFIGPREFIX . 'bindzone'])) {
+                    $bindzone = $config['installedpackages'][self::CONFIGPREFIX . 'bindzone'];
+                    for ($x = 0; $x < sizeof($bindzone); $x++) {
+                        $zone = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x];
+                        if ($zone['view'] == $view && $zone['name'] == $rzone && $zone['type'] == $zonetype) {
+                            if ($zone['resultconfig'] != $data) {
+                                $zone['resultconfig'] = $data;
+                                write_config("sxbind: Saved resulting config file for zone " . $zonename . " in xml");
+                            }
+                        }
+                    }
+                }
+            }
 
             unlink($tempDB);
 
@@ -192,10 +239,11 @@ namespace sxbind {
             return self::parse_rndc_zone_dump(self::get_rndc_zone_dump());
         }
 
-public static function create_tsig_key($name){
+        public static function create_tsig_key($name)
+        {
             exec('tsig-keygen ' . escapeshellcmd($name) . ' 2>&1', $output, $retval);
             return implode("\n", $output);
-}
+        }
 
         /**
          * Returns the complete Zone Dump including all Zones, served by BIND. This includes all master, slave and automatically created Zones.
@@ -256,9 +304,9 @@ public static function create_tsig_key($name){
             $output = null;
             $retval = null;
 
-            exec("/usr/local/sbin/named-compilezone -j -f text -F text -q -i none -s full -o " . escapeshellarg($tmpfname) . " " . escapeshellarg($zone) . " " . escapeshellarg($zoneFile) . ' 2>&1', $output, $retval);
+            exec(self::$PATH_COMPILEZONE . ' -j -f text -F text -q -i none -s full -o ' . escapeshellarg($tmpfname) . " " . escapeshellarg($zone) . " " . escapeshellarg($zoneFile) . ' 2>&1', $output, $retval);
             if ($retval != 0) {
-                exec("/usr/local/sbin/named-compilezone -j -f raw -F text -q -i none -s full -o " . escapeshellarg($tmpfname) . " " . escapeshellarg($zone) . " " . escapeshellarg($zoneFile) . ' 2>&1', $output, $retval);
+                exec(self::$PATH_COMPILEZONE . ' -j -f raw -F text -q -i none -s full -o ' . escapeshellarg($tmpfname) . " " . escapeshellarg($zone) . " " . escapeshellarg($zoneFile) . ' 2>&1', $output, $retval);
                 if ($retval !== 0) {
                     throw new \Exception('Exception during zone compiling. Code:' . $retval . " \n" . implode("\n", $output));
                 }
@@ -795,13 +843,13 @@ public static function create_tsig_key($name){
             //exec("{$rndc} sync -clean " . escapeshellarg($zonename) . " IN " . escapeshellarg($zoneview));
 
             // TODO: Check if there is a better way to detect if zone is raw or text.
-            exec('/usr/local/sbin/named-compilezone -j -f text -F text -i none -s full ' .
+            exec(self::$PATH_COMPILEZONE . ' -j -f text -F text -i none -s full ' .
                 ' -o ' . escapeshellarg($temp_zone_file) . ' ' .
                 escapeshellarg($zonename) . ' ' .
                 escapeshellarg($zonefile) . ' 2>&1', $output, $resultCode);
 
             if ($resultCode != 0) {
-                exec('/usr/local/sbin/named-compilezone -j -f raw -F text -i none -k ignore -m ignore -M ignore -S ignore -W ignore -s full ' .
+                exec(self::$PATH_COMPILEZONE . ' -j -f raw -F text -i none -k ignore -m ignore -M ignore -S ignore -W ignore -s full ' .
                     ' -o ' . escapeshellarg($temp_zone_file) . ' ' .
                     escapeshellarg($zonename) . ' ' .
                     escapeshellarg($zonefile) . ' 2>&1', $output, $resultCode);
@@ -833,15 +881,68 @@ public static function create_tsig_key($name){
         public static function ip_to_ptr($ip)
         {
             $ipstring = trim($ip);
+            // remove Subnet if exists.
+            $cx = strpos($ipstring, '/');
+            if ($cx) {
+                $subnet = (int) (substr($ipstring, $cx + 1));
+                $ipstring = substr($ipstring, 0, $cx);
+            } else {
+                $subnet = null; // No netmask present
+            }
 
             if (str_contains($ipstring, ':')) {
+                //calculate subnet from incomlete IPv6 and complete ip wwith "0"
+                $length = substr_count($ipstring, ':');
+                if (!str_contains($ipstring, '::') && $length < 7) {
+                    if (str_ends_with($ipstring, ':')) {
+                        $ipstring = $ipstring . ':';
+                    } else {
+                        $ipstring = $ipstring . '::';
+                    }
+                    if ($subnet == null) {
+                        $subnet = ($length + 1) * 16;
+                    }
+                } else {
+                    if ($subnet == null) {
+                        $subnet = 128;
+                    }
+                }
+
+                // get reverse IPv6
                 $unpack = unpack('H*hex', inet_pton($ipstring));
                 $hex = $unpack['hex'];
-                return implode('.', array_reverse(str_split($hex))) . '.ip6.arpa';
+                $iparr = array_reverse(str_split($hex));
+                if ($subnet < 128) {
+                    $iparr = array_slice($iparr, intval(32 - floor($subnet / 4)));
+                }
+                $result = implode('.', $iparr) . '.ip6.arpa';
             } else {
-                $addr = implode('.', array_reverse(explode(".", $ipstring)));
-                return $addr . '.in-addr.arpa';
+                //calculate subnet from incomlete IPv4 and complete ip wwith "0"
+                $ipstring = trim($ipstring, '.');
+                $length = substr_count($ipstring, '.');
+                if ($length < 3) {
+                    for ($i = $length; $i < 3; $i++) {
+                        $ipstring = $ipstring . '.0';
+                    }
+                    if ($subnet == null) {
+                        $subnet = ($length + 1) * 8;
+                    }
+                } else {
+                    if ($subnet == null) {
+                        $subnet = 32;
+                    }
+                }
+
+                // get reverse IPv4
+                $iparr = array_reverse(explode(".", $ipstring));
+                if ($subnet < 32) {
+                    $iparr = array_slice($iparr, intval(4 - floor($subnet / 8)));
+                }
+                $addr = implode('.', $iparr);
+                $result = $addr . '.in-addr.arpa';
             }
+
+            return $result;
         }
 
         // convert IPv4 or IPv6 from PTR string to it's IP address
@@ -943,8 +1044,8 @@ public static function create_tsig_key($name){
         {
             global $config;
 
-            if (is_array($config['installedpackages']['bindzone'])) {
-                $bindzone = $config['installedpackages']['bindzone']['config'];
+            if (is_array($config['installedpackages'][self::CONFIGPREFIX . 'bindzone'])) {
+                $bindzone = $config['installedpackages'][self::CONFIGPREFIX . 'bindzone']['config'];
                 $col = array_column($bindzone, 'name');
                 array_multisort($col, SORT_ASC, $bindzone);
             } else {
@@ -1090,4 +1191,18 @@ public static function create_tsig_key($name){
             }
         }
     }
-} ?>
+
+
+    if (file_exists('/usr/local/sbin/named-checkzone')) {
+        ZoneParser::$PATH_CHECKZONE = '/usr/local/sbin/named-checkzone';
+    } else {
+        ZoneParser::$PATH_CHECKZONE = '/usr/local/bin/named-checkzone';
+    }
+
+    if (file_exists('/usr/local/sbin/named-compilezone')) {
+        ZoneParser::$PATH_COMPILEZONE = '/usr/local/sbin/named-compilezone';
+    } else {
+        ZoneParser::$PATH_COMPILEZONE = '/usr/local/bin/named-compilezone';
+    }
+}
+?>

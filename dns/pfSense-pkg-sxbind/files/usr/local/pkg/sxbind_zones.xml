@@ -46,8 +46,20 @@
 		</tab>
 		<tab>
 			<text>Zones</text>
-			<url>/pkg.php?xml=sxbind_zones.xml&amp;id=0</url>
-			<active/>
+			<url>/pkg.php?xml=sxbind_zones.xml</url>
+			<active />
+		</tab>
+		<tab>
+			<text>Tools</text>
+			<url>/sxbind_tools.php</url>
+		</tab>
+		<tab>
+			<text>Show all Zone Records</text>
+			<url>/sxbind_dump.php</url>
+		</tab>
+		<tab>
+			<text>Edit Zone DB</text>
+			<url>/sxbind_zoneEdit.php</url>
 		</tab>
 		<tab>
 			<text>Sync</text>
@@ -96,48 +108,33 @@
 			<type>checkbox</type>
 		</field>
 		<field>
-			<fielddescr>Zone Name</fielddescr>
-			<fieldname>name</fieldname>
-			<description>
-				<![CDATA[
-				Enter the name for this zone (e.g. example.com)<br />
-				For reverse zones, include zone IP in reverse order. (e.g. 1.168.192)<br />
-				<strong>Note: IN-ADDR.ARPA will be automaticaly included in config files when reverse zone option is checked.</strong>
-				]]>
-			</description>
-			<type>input</type>
-			<required/>
-		</field>
-		<field>
-			<fielddescr>Description</fielddescr>
-			<fieldname>description</fieldname>
-			<description>Enter a description for this zone.</description>
-			<type>input</type>
-			<size>70</size>
-		</field>
-		<field>
 			<fielddescr>Zone Type</fielddescr>
 			<fieldname>type</fieldname>
 			<description>Select zone type.</description>
 			<type>select</type>
 			<options>
-				<option><name>Master</name><value>master</value><enablefields>description</enablefields></option>
-				<option><name>Slave</name><value>slave</value><enablefields>tll</enablefields></option>
-				<option><name>Forward</name><value>forward</value><enablefields>forward</enablefields></option>
-				<option><name>Redirect</name><value>redirect</value><enablefields>redirect</enablefields></option>
+				<option>
+					<name>Master</name>
+					<value>master</value>
+					<enablefields>description</enablefields>
+				</option>
+				<option>
+					<name>Slave</name>
+					<value>slave</value>
+					<enablefields>tll</enablefields>
+				</option>
+				<option>
+					<name>Forward</name>
+					<value>forward</value>
+					<enablefields>forward</enablefields>
+				</option>
+				<option>
+					<name>Redirect</name>
+					<value>redirect</value>
+					<enablefields>redirect</enablefields>
+				</option>
 			</options>
-			<required/>
-		</field>
-		<field>
-			<fielddescr>View</fielddescr>
-			<fieldname>view</fieldname>
-			<description>Select (CTRL+click) the views that this zone will belong to.</description>
-			<type>select_source</type>
-			<source><![CDATA[$config['installedpackages']['sxbindviews']['config']]]></source>
-			<source_name>name</source_name>
-			<source_value>name</source_value>
-			<multiple/>
-			<size>02</size>
+			<required />
 		</field>
 		<field>
 			<fielddescr>Reverse Zone</fielddescr>
@@ -151,6 +148,54 @@
 			<fieldname>reversv6o</fieldname>
 			<description>Check if this is an IPv6 reverse zone. Reverse Zone must also be enabled.</description>
 			<type>checkbox</type>
+		</field>
+		<field>
+			<fielddescr>IP for Reverse Zone</fielddescr>
+			<fieldname>tempconverttoreverse</fieldname>
+			<description>
+				<![CDATA[
+				Enter the IP Address for this zone in regular CIDR notation and it will automatically converted to reverse syntax.<br />
+				You may skip this field and enter the reverse name directly in the field "Zone Name".
+				]]>
+			</description>
+			<type>input</type>
+			<required />
+		</field>
+		<field>
+			<fielddescr>Zone Name</fielddescr>
+			<fieldname>name</fieldname>
+			<description>
+				<![CDATA[
+				Enter the name for this zone (e.g. example.com)<br />
+				For reverse zones, use the IP in reverse order.<br />
+				<strong>Do not include .IN-ADDR.ARPA or .IPv6.ARPA as it will be automaticaly included in config files when reverse zone option is checked.</strong>
+				]]>
+			</description>
+			<type>input</type>
+			<required />
+		</field>
+		<field>
+			<fielddescr>Zone FQDN</fielddescr>
+			<fieldname>tempfullzonename</fieldname>
+			<type>input</type>
+		</field>
+		<field>
+			<fielddescr>Description</fielddescr>
+			<fieldname>description</fieldname>
+			<description>Enter a description for this zone.</description>
+			<type>input</type>
+			<size>70</size>
+		</field>
+		<field>
+			<fielddescr>View</fielddescr>
+			<fieldname>view</fieldname>
+			<description>Select (CTRL+click) the views that this zone will belong to.</description>
+			<type>select_source</type>
+			<source><![CDATA[$config['installedpackages']['sxbindviews']['config']]]></source>
+			<source_name>name</source_name>
+			<source_value>name</source_value>
+			<multiple/>
+			<size>02</size>
 		</field>
 		<field>
 			<fielddescr>Response Policy Zone</fielddescr>

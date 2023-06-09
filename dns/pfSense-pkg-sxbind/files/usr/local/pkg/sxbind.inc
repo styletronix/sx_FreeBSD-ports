@@ -147,7 +147,7 @@ function sxbind_sync()
 {
 	global $config;
 	$named_process = "named";
-	$bind = $config['installedpackages']['sxbind']['config'][0];
+	$bind = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bind']['config'][0];
 	// Create rndc
 	$rndc_confgen = "/usr/local/sbin/rndc-confgen";
 	$rndc_port = $bind['controlport'] == "" ? "8953" : $bind['controlport'];
@@ -188,8 +188,8 @@ function sxbind_sync()
 		}
 	}
 
-	if (is_array($config['installedpackages']['sxbindzone'])) {
-		$bindzone = $config['installedpackages']['sxbindzone']['config'];
+	if (is_array($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone'])) {
+		$bindzone = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'];
 	} else {
 		$bindzone = array();
 	}
@@ -341,18 +341,18 @@ EOD;
 	// Config Zone domain
 
 	// Add ACLS
-	if (!is_array($config['installedpackages']['sxbindacls']) || !is_array($config['installedpackages']['sxbindacls']['config'])) {
-		$config['installedpackages']['sxbindacls']['config'][] =
+	if (!is_array($config['installedpackages']['sxbindacls']) || !is_array($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'])) {
+		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
 			array("name" => "none", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		$config['installedpackages']['sxbindacls']['config'][] =
+		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
 			array("name" => "any", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		$config['installedpackages']['sxbindacls']['config'][] =
+		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
 			array("name" => "localhost", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		$config['installedpackages']['sxbindacls']['config'][] =
+		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
 			array("name" => "localnets", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
 		write_config("Created BIND Built-in ACLs");
 	}
-	$bindacls = $config['installedpackages']['sxbindacls']['config'];
+	$bindacls = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'];
 	for ($i = 0; $i < sizeof($bindacls); $i++) {
 		$aclname = $bindacls[$i]['name'];
 		$aclhost = $bindacls[$i]['row'];
@@ -367,15 +367,15 @@ EOD;
 	}
 
 	// Add Views
-	if (is_array($config['installedpackages']['sxbindviews'])) {
-		$bindview = $config['installedpackages']['sxbindviews']['config'];
+	if (is_array($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindviews'])) {
+		$bindview = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindviews']['config'];
 	} else {
 		$bindview = array();
 	}
 
 
 	for ($i = 0; $i < sizeof($bindview); $i++) {
-		$views = $config['installedpackages']['sxbindviews']['config'][$i];
+		$views = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindviews']['config'][$i];
 		$viewname = $views['name'];
 		$viewrecursion = $views['recursion'];
 		if ($views['match-clients'] == '') {
@@ -730,11 +730,11 @@ EOD;
 
 							if ($result['success']) {
 								/* Validation successfull
-																											Save zone_conf to cache file for comparison on next update. */
+																																																			Save zone_conf to cache file for comparison on next update. */
 								file_put_contents($zone_cache_file, $zone_conf_orig);
 								$data = base64_encode($zone_conf . $zone_conf_dynamic);
-								if ($config['installedpackages']['sxbindzone']['config'][$x]['resultconfig'] != $data) {
-									$config['installedpackages']['sxbindzone']['config'][$x]['resultconfig'] = $data;
+								if ($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x]['resultconfig'] != $data) {
+									$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x]['resultconfig'] = $data;
 									$write_config++;
 								}
 
@@ -806,8 +806,8 @@ EOD;
 									exec("$dsfromkey $filename", $dsset);
 
 									$data = base64_encode(array_pop($dsset) . "\n" . array_pop($dsset));
-									if ($config['installedpackages']['sxbindzone']['config'][$x]['dsset'] != $data) {
-										$config['installedpackages']['sxbindzone']['config'][$x]['dsset'] = $data;
+									if ($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x]['dsset'] != $data) {
+										$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x]['dsset'] = $data;
 										$write_config++;
 									}
 								}
@@ -831,9 +831,9 @@ EOD;
 											'description' => "sxbind {$zonename} DNSSEC backup file",
 											'filedata' => base64_encode(file_get_contents($filename))
 										);
-											$config['installedpackages']['dnsseckeys']['config'][] = $data;
-											$write_config++;
-											$dnssec_keys++;
+										$config['installedpackages']['dnsseckeys']['config'][] = $data;
+										$write_config++;
+										$dnssec_keys++;
 									}
 								}
 								if ($dnssec_keys > 0) {
@@ -864,8 +864,8 @@ EOD;
 						}
 
 						$data = base64_encode($rsconfig);
-						if ($config['installedpackages']['sxbindzone']['config'][$x]['resultconfig'] != $data) {
-							$config['installedpackages']['sxbindzone']['config'][$x]['resultconfig'] = $data;
+						if ($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x]['resultconfig'] != $data) {
+							$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x]['resultconfig'] = $data;
 							$write_config++;
 						}
 
@@ -873,8 +873,8 @@ EOD;
 
 					case 'forward':
 						// Forwarder zone does not have a DB file
-						if ($config['installedpackages']['sxbindzone']['config'][$x]['resultconfig'] != '') {
-							$config['installedpackages']['sxbindzone']['config'][$x]['resultconfig'] = '';
+						if ($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x]['resultconfig'] != '') {
+							$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x]['resultconfig'] = '';
 							$write_config++;
 						}
 						break;
@@ -973,126 +973,192 @@ function sxbind_print_javascript_type_zone()
 	$js = <<<'JS'
 	<script>
 	events.push(function(){
-		on_type_zone_changed();
-		$("textarea#resultconfig").attr("disabled", true);
-		$("textarea#dsset").attr("disabled", true);
-		$("select#type").change(function(){on_type_zone_changed();});
+		var $on_zonename_changed_timer = null
+
+		$("input#reversv6o").closest(".form-group").hide()
+		$("input#tempconverttoreverse").closest(".form-group").hide()
+		$("textarea#resultconfig").attr("disabled", true)
+		$("textarea#dsset").attr("disabled", true)
+		$("input#tempfullzonename").attr("readonly","readonly")
+
+		$("select#type").on('input', on_type_zone_changed)
+
+		$("input#reverso").on('input',function(){
+			if (!$("#reverso").is(':checked')){
+				$("#reversv6o").prop("checked","")
+				$("input#tempconverttoreverse").closest(".form-group").hide()
+				$("input#reversv6o").closest(".form-group").hide()
+			}else{
+				$("input#tempconverttoreverse").closest(".form-group").show()
+				$("input#reversv6o").closest(".form-group").show()
+			}
+			on_zonename_changed()
+		})
+
+		$("input#reversv6o").on('input', function(){
+			if ($("#reversv6o").is(':checked')){$("#reverso").prop("checked", true)}
+			on_zonename_changed()
+		})
+
+		$("input#tempconverttoreverse").on('input', on_zonename_changed)
+
+		function on_zonename_changed() {
+			$("input#name").val("[calculating name....]")
+			$("input#tempfullzonename").val("[calculating name....]")
+			
+			clearTimeout($on_zonename_changed_timer)
+			$on_zonename_changed_timer = setTimeout(getPTR, 1000);
+		}
+
+		function getPTR(){
+			$.ajax({
+                type: 'post',
+				url: '/sxbind_tools.php',
+                data: {
+                    action: "convert_ip_to_ptr",
+					ip: $("#tempconverttoreverse").val()
+                },
+                success: function (data) {
+					data = data.toUpperCase();
+					if (data.endsWith('.IP6.ARPA')){
+						$("#reversv6o").prop("checked","true")
+						$("#reversv6o").val(true);
+                    	$("input#tempfullzonename").val(data)
+						$("input#name").val(data.replace('.IP6.ARPA',''))
+
+					}else if (data.endsWith('.IN-ADDR.ARPA')){
+						$("#reversv6o").prop("checked","")
+						$("#reversv6o").val(false);
+                    	$("input#tempfullzonename").val(data)
+						$("input#name").val(data.replace('.IN-ADDR.ARPA',''))
+
+					}else{
+                    	$("input#tempfullzonename").val("")
+					}
+                },
+                error: function (data) {
+                  	$("input#name").val("[error]")
+					$("input#tempfullzonename").val("[error]")
+                }
+			})
+		}
 
 		function on_type_zone_changed() {
-			var tipo = $("select#type").val();
-			switch (tipo) {
+			switch ($("select#type").val()) {
 				case 'master':
-					$("input#slaveip").attr("disabled", true);
-					$("input#tll").attr("disabled", false);
-					$("input#nameserver").attr("disabled", false);
-					$("input#reverso").attr("disabled", false);
-					$("input#reversv6o").attr("disabled", false);
-					$("input#forwarders").attr("disabled", true);
-					$("input#dnssec").attr("disabled", false);
-					$("input#backupkeys").attr("disabled", false);
-					$("input#regdhcpstatic").attr("disabled", false);
-					$("input#ipns").attr("disabled", false);
-					$("input#mail").attr("disabled", false);
-					$("input#serial").attr("disabled", false);
-					$("input#refresh").attr("disabled", false);
-					$("input#retry").attr("disabled", false);
-					$("input#expire").attr("disabled", false);
-					$("input#minimum").attr("disabled", false);
-					$("select#allowquery\\[\\]").attr("disabled", false);
-					$("select#allowupdate\\[\\]").attr("disabled", false);
-					$("select#allowtransfer\\[\\]").attr("disabled", false);
-					$("input#enable_updatepolicy").attr("disabled", false);
-					$("input#updatepolicy").attr("disabled", true);
-					$("input#rpz").attr("disabled", false);
-					$("input#validate_zone").attr("disabled", false);
-					$("input#ddns_merging").attr("disabled", false);
-					$("input#increment_serial").attr("disabled", false);
+					$("input#slaveip").closest(".form-group").hide()
+					$("input#tll").closest(".form-group").show()
+					$("input#nameserver").closest(".form-group").show()
+					$("input#reverso").closest(".form-group").show()
+					$("input#reversv6o").closest(".form-group").show()
+					$("input#forwarders").closest(".form-group").hide()
+					$("input#dnssec").closest(".form-group").show()
+					$("input#backupkeys").closest(".form-group").show()
+					$("input#regdhcpstatic").closest(".form-group").show()
+					$("input#ipns").closest(".form-group").show()
+					$("input#mail").closest(".form-group").show()
+					$("input#serial").closest(".form-group").show()
+					$("input#refresh").closest(".form-group").show()
+					$("input#retry").closest(".form-group").show()
+					$("input#expire").closest(".form-group").show()
+					$("input#minimum").closest(".form-group").show()
+					$("select#allowquery\\[\\]").closest(".form-group").show()
+					$("select#allowupdate\\[\\]").closest(".form-group").show()
+					$("select#allowtransfer\\[\\]").closest(".form-group").show()
+					$("input#enable_updatepolicy").closest(".form-group").show()
+					$("input#updatepolicy").closest(".form-group").hide()
+					$("input#rpz").closest(".form-group").show()
+					$("input#validate_zone").closest(".form-group").show()
+					$("input#ddns_merging").closest(".form-group").show()
+					$("input#increment_serial").closest(".form-group").show()
 					break;
 				case 'slave':
-					$("input#slaveip").attr("disabled", false);
-					$("input#tll").attr("disabled", true);
-					$("input#nameserver").attr("disabled", true);
-					$("input#reverso").attr("disabled", false);
-					$("input#reversv6o").attr("disabled", false);
-					$("input#forwarders").attr("disabled", true);
-					$("input#dnssec").attr("disabled", false);
-					$("input#backupkeys").attr("disabled", false);
-					$("input#regdhcpstatic").attr("disabled", false);
-					$("input#ipns").attr("disabled", true);
-					$("input#mail").attr("disabled", true);
-					$("input#serial").attr("disabled", true);
-					$("input#refresh").attr("disabled", true);
-					$("input#retry").attr("disabled", true);
-					$("input#expire").attr("disabled", true);
-					$("input#minimum").attr("disabled", true);
-					$("select#allowquery\\[\\]").attr("disabled", false);
-					$("select#allowupdate\\[\\]").attr("disabled", true);
-					$("select#allowtransfer\\[\\]").attr("disabled", true);
-					$("input#enable_updatepolicy").attr("disabled", true);
-					$("input#updatepolicy").attr("disabled", true);
-					$("input#rpz").attr("disabled", false);
-					$("input#validate_zone").attr("disabled", true);
-					$("input#ddns_merging").attr("disabled", true);
-					$("input#increment_serial").attr("disabled", true);
+					$("input#slaveip").closest(".form-group").show()
+					$("input#tll").closest(".form-group").hide()
+					$("input#nameserver").closest(".form-group").hide()
+					$("input#reverso").closest(".form-group").show()
+					$("input#reversv6o").closest(".form-group").show()
+					$("input#forwarders").closest(".form-group").hide()
+					$("input#dnssec").closest(".form-group").show()
+					$("input#backupkeys").closest(".form-group").show()
+					$("input#regdhcpstatic").closest(".form-group").show()
+					$("input#ipns").closest(".form-group").hide()
+					$("input#mail").closest(".form-group").hide()
+					$("input#serial").closest(".form-group").hide()
+					$("input#refresh").closest(".form-group").hide()
+					$("input#retry").closest(".form-group").hide()
+					$("input#expire").closest(".form-group").hide()
+					$("input#minimum").closest(".form-group").hide()
+					$("select#allowquery\\[\\]").closest(".form-group").show()
+					$("select#allowupdate\\[\\]").closest(".form-group").hide()
+					$("select#allowtransfer\\[\\]").closest(".form-group").hide()
+					$("input#enable_updatepolicy").closest(".form-group").hide()
+					$("input#updatepolicy").closest(".form-group").hide()
+					$("input#rpz").closest(".form-group").show()
+					$("input#validate_zone").closest(".form-group").hide()
+					$("input#ddns_merging").closest(".form-group").hide()
+					$("input#increment_serial").closest(".form-group").hide()
 					break;
 				case 'forward':
-					$("input#slaveip").attr("disabled", true);
-					$("input#tll").attr("disabled", true);
-					$("input#nameserver").attr("disabled", true);
-					$("input#reverso").attr("disabled", true);
-					$("input#reversv6o").attr("disabled", true);
-					$("input#forwarders").attr("disabled", false);
-					$("input#dnssec").attr("disabled", true);
-					$("input#backupkeys").attr("disabled", true);
-					$("input#regdhcpstatic").attr("disabled", true);
-					$("input#ipns").attr("disabled", true);
-					$("input#mail").attr("disabled", true);
-					$("input#serial").attr("disabled", true);
-					$("input#refresh").attr("disabled", true);
-					$("input#retry").attr("disabled", true);
-					$("input#expire").attr("disabled", true);
-					$("input#minimum").attr("disabled", true);
-					$("select#allowquery\\[\\]").attr("disabled", true);
-					$("select#allowupdate\\[\\]").attr("disabled", true);
-					$("select#allowtransfer\\[\\]").attr("disabled", true);
-					$("input#enable_updatepolicy").attr("disabled", true);
-					$("input#updatepolicy").attr("disabled", true);
-					$("input#rpz").attr("disabled", true);
-					$("input#validate_zone").attr("disabled", true);
-					$("input#ddns_merging").attr("disabled", true);
-					$("input#increment_serial").attr("disabled", false);
+					$("input#slaveip").closest(".form-group").hide()
+					$("input#tll").closest(".form-group").hide()
+					$("input#nameserver").closest(".form-group").hide()
+					$("input#reverso").closest(".form-group").hide()
+					$("input#reversv6o").closest(".form-group").hide()
+					$("input#forwarders").closest(".form-group").show()
+					$("input#dnssec").closest(".form-group").hide()
+					$("input#backupkeys").closest(".form-group").hide()
+					$("input#regdhcpstatic").closest(".form-group").hide()
+					$("input#ipns").closest(".form-group").hide()
+					$("input#mail").closest(".form-group").hide()
+					$("input#serial").closest(".form-group").hide()
+					$("input#refresh").closest(".form-group").hide()
+					$("input#retry").closest(".form-group").hide()
+					$("input#expire").closest(".form-group").hide()
+					$("input#minimum").closest(".form-group").hide()
+					$("select#allowquery\\[\\]").closest(".form-group").hide()
+					$("select#allowupdate\\[\\]").closest(".form-group").hide()
+					$("select#allowtransfer\\[\\]").closest(".form-group").hide()
+					$("input#enable_updatepolicy").closest(".form-group").hide()
+					$("input#updatepolicy").closest(".form-group").hide()
+					$("input#rpz").closest(".form-group").hide()
+					$("input#validate_zone").closest(".form-group").hide()
+					$("input#ddns_merging").closest(".form-group").hide()
+					$("input#increment_serial").closest(".form-group").show()
 					break;
 				case 'redirect':
-					$("input#slaveip").attr("disabled", true);
-					$("input#tll").attr("disabled", true);
-					$("input#nameserver").attr("disabled", false);
-					$("input#reverso").attr("disabled", true);
-					$("input#reversv6o").attr("disabled", true);
-					$("input#forwarders").attr("disabled", false);
-					$("input#dnssec").attr("disabled", true);
-					$("input#backupkeys").attr("disabled", true);
-					$("input#regdhcpstatic").attr("disabled", true);
-					$("input#ipns").attr("disabled", true);
-					$("input#mail").attr("disabled", false);
-					$("input#serial").attr("disabled", false);
-					$("input#refresh").attr("disabled", false);
-					$("input#retry").attr("disabled", false);
-					$("input#expire").attr("disabled", false);
-					$("input#minimum").attr("disabled", false);
-					$("select#allowquery\\[\\]").attr("disabled", false);
-					$("select#allowupdate\\[\\]").attr("disabled", true);
-					$("select#allowtransfer\\[\\]").attr("disabled", true);
-					$("input#enable_updatepolicy").attr("disabled", true);
-					$("input#updatepolicy").attr("disabled", true);
-					$("input#rpz").attr("disabled", true);
-					$("input#validate_zone").attr("disabled", true);
-					$("input#ddns_merging").attr("disabled", true);
-					$("input#increment_serial").attr("disabled", false);
+					$("input#slaveip").closest(".form-group").hide()
+					$("input#tll").closest(".form-group").hide()
+					$("input#nameserver").closest(".form-group").show()
+					$("input#reverso").closest(".form-group").hide()
+					$("input#reversv6o").closest(".form-group").hide()
+					$("input#forwarders").closest(".form-group").show()
+					$("input#dnssec").closest(".form-group").hide()
+					$("input#backupkeys").closest(".form-group").hide()
+					$("input#regdhcpstatic").closest(".form-group").hide()
+					$("input#ipns").closest(".form-group").hide()
+					$("input#mail").closest(".form-group").show()
+					$("input#serial").closest(".form-group").show()
+					$("input#refresh").closest(".form-group").show()
+					$("input#retry").closest(".form-group").show()
+					$("input#expire").closest(".form-group").show()
+					$("input#minimum").closest(".form-group").show()
+					$("select#allowquery\\[\\]").closest(".form-group").show()
+					$("select#allowupdate\\[\\]").closest(".form-group").hide()
+					$("select#allowtransfer\\[\\]").closest(".form-group").hide()
+					$("input#enable_updatepolicy").closest(".form-group").hide()
+					$("input#updatepolicy").closest(".form-group").hide()
+					$("input#rpz").closest(".form-group").hide()
+					$("input#validate_zone").closest(".form-group").hide()
+					$("input#ddns_merging").closest(".form-group").hide()
+					$("input#increment_serial").closest(".form-group").show()
 					break;
 				default:
 					break;
 			}
 		}
+
+				on_type_zone_changed()
 	});
 	</script>
 JS;
@@ -1102,7 +1168,7 @@ JS;
 function sxbind_write_rcfile()
 {
 	global $config;
-	$bind = $config['installedpackages']['sxbind']['config'][0];
+	$bind = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bind']['config'][0];
 	$ip_version = ($bind['bind_ip_version'] ? $bind['bind_ip_version'] : "");
 	$rc = array();
 	$BIND_LOCALBASE = "/usr/local";
@@ -1143,8 +1209,8 @@ function sxbind_sync_on_changes()
 {
 	global $config, $g;
 
-	if (is_array($config['installedpackages']['sxbindsync']['config'])) {
-		$bind_sync = $config['installedpackages']['sxbindsync']['config'][0];
+	if (is_array($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindsync']['config'])) {
+		$bind_sync = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindsync']['config'][0];
 		$synconchanges = $bind_sync['synconchanges'];
 		$synctimeout = (int) $bind_sync['synctimeout'] ?: 30;
 		$master_zone_ip = $bind_sync['masterip'];
@@ -1267,16 +1333,16 @@ function sxbind_do_xmlrpc_sync($sync_to_ip, $port, $protocol, $username, $passwo
 
 	/* XML will hold the sections to sync */
 	$xml = array();
-	$xml['sxbind'] = $config['installedpackages']['sxbind'];
-	$xml['sxbindacls'] = $config['installedpackages']['sxbindacls'];
-	$xml['sxbindviews'] = $config['installedpackages']['sxbindviews'];
-	$xml['sxbindzone'] = $config['installedpackages']['sxbindzone'];
+	$xml['sxbind'] = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bind'];
+	$xml['sxbindacls'] = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls'];
+	$xml['sxbindviews'] = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindviews'];
+	$xml['sxbindzone'] = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone'];
 	if (is_array($config['installedpackages']['dnsseckeys'])) {
 		$xml['dnsseckeys'] = $config['installedpackages']['dnsseckeys'];
 	}
 	// Change master zone to slave on backup servers
 	if (is_array($xml['sxbindzone']["config"])) {
-		for ($x = 0; $x < sizeof($xml['sxbindzone']["config"]); $x++) {
+		for ($x = 0; $x < sizeof($xml[ZoneParser::CONFIGPREFIX . 'bindzone']["config"]); $x++) {
 			if ($xml['sxbindzone']["config"][$x]['type'] == "master") {
 				$xml['sxbindzone']["config"][$x]['type'] = "slave";
 				$xml['sxbindzone']["config"][$x]['slaveip'] = $master_zone_ip;

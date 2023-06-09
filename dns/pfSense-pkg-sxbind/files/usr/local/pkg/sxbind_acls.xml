@@ -39,7 +39,7 @@
 		<tab>
 			<text>ACLs</text>
 			<url>/pkg.php?xml=sxbind_acls.xml</url>
-			<active/>
+			<active />
 		</tab>
 		<tab>
 			<text>Views</text>
@@ -48,6 +48,18 @@
 		<tab>
 			<text>Zones</text>
 			<url>/pkg.php?xml=sxbind_zones.xml</url>
+		</tab>
+		<tab>
+			<text>Tools</text>
+			<url>/sxbind_tools.php</url>
+		</tab>
+		<tab>
+			<text>Show all Zone Records</text>
+			<url>/sxbind_dump.php</url>
+		</tab>
+		<tab>
+			<text>Edit Zone DB</text>
+			<url>/sxbind_zoneEdit.php</url>
 		</tab>
 		<tab>
 			<text>Sync</text>

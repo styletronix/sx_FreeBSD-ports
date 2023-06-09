@@ -1,6 +1,6 @@
 <?php
 /*
- * zoneEdit.php
+ * sxbind_tools.php
  *
  * Copyright (c) 2023 Andreas W. Pross (Styletronix.net)
  * All rights reserved.
@@ -24,23 +24,37 @@ require_once("guiconfig.inc");
 require_once("config.inc");
 require_once("/usr/local/pkg/sxbind_zoneparser.inc");
 require_once("/usr/local/pkg/sxbind.inc");
+require_once("sxbind.inc");
 
 if ($_POST) {
-    if ($_POST['action']== 'create_tsig'){
+    if ($_POST['action'] == 'create_tsig') {
         $key = ZoneParser::create_tsig_key($_POST['tsig_name']);
+        print($key);
+
+        if ($_POST['tsig_to_bind_config'] == true) {
+            //TODO: Add to config
+        }
+
+        exit;
     }
-    print($key);
-    exit;
+
+    if ($_POST['action'] == 'convert_ip_to_ptr') {
+        try{
+            print(ZoneParser::ip_to_ptr($_POST['ip']));
+            exit;
+        }catch(Exception $ex){
+            die(500);
+        }
+      
+    }
 }
 
 $pgtitle = array(gettext("Services"), gettext("Bind Tools"));
 $shortcut_section = "sxbind";
 include("head.inc");
 
-// $tab_array = array();
-// $tab_array[] = array(gettext("Show all Zones"), false, "/packages/binddump/binddump.php");
-// $tab_array[] = array(gettext("Edit RAW Zone File"), true, "/packages/binddump/zoneEdit.php");
-// display_top_tabs($tab_array);
+get_top_tabs();
+
 
 if ($input_errors) {
     print_input_errors($input_errors);
@@ -69,13 +83,29 @@ if (!empty($savemsg)) {
                     <input type="text" class="form-control" name="tsig_name" id="tsig_name" />
                 </div>
             </div>
+            <div class="form-group">
+                <label for="tsig_key" class="col-sm-2 control-label">
+                    <span>
+                        <?= gettext('TSIG-Key') ?>
+                    </span>
+                </label>
+                <div style="display:hidden" id="tsig_key_field" class="col-sm-10">
+                    <textarea class="form-control" id="tsig_key" name="tsig_key" rows="5"
+                        readonly="readonly" val="Click on  "\Create Key\" to show new TSIG-Key "></textarea>
+                </div>
+            </div>
         </div>
+
         <div class="panel-footer">
-            <button class="btn btn-default" type="submit" id="create_tsig" name="action" value="create_tsig"><?=gettext("Create Key")?></button>
+            <button class="btn btn-default" id="btn_create_tsig" name="action" value="create_tsig">
+                <?= gettext("Create Key") ?>
+            </button>
+             <button class="btn btn-default" id="btn_create_tsig_add" name="action" value="create_tsig">
+                <?= gettext("Create Key and add to BIND Config") ?>
+            </button>
         </div>
     </div>
 </form>
-
 
 <?
 include('foot.inc');
@@ -100,8 +130,38 @@ include('foot.inc');
         $('#dlg_updatestatus_text').modal('hide')
     }
 
+    function create_tsig(addToConfig) {
+        $("#tsig_key").val("Creating Key....")
+        $("#tsig_key_field").show()
+
+        $.ajax(
+            {
+                type: 'post',
+                data: {
+                    action: "create_tsig",
+                    tsig_name: $("#tsig_name").val(),
+                    tsig_to_bind_config: addToConfig
+                },
+                success: function (data) {
+                    hideWait();
+                    $("#tsig_key").val(data)
+                },
+                error: function (data) {
+                    hideWait();
+                    showMessage(data.responseText);
+                }
+            });
+    }
 
     events.push(function () {
-        
+        $("#btn_create_tsig").on("click", function (e) {
+            e.preventDefault()
+            create_tsig()
+        })
+
+        $("#btn_create_tsig_add").on("click", function (e) {
+            e.preventDefault()
+            create_tsig(true)
+        })
     })
 </script>
