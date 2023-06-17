@@ -24,7 +24,6 @@ require_once("guiconfig.inc");
 require_once("config.inc");
 require_once("/usr/local/pkg/sxbind_zoneparser.inc");
 require_once("/usr/local/pkg/sxbind.inc");
-require_once("sxbind.inc");
 
 if ($_POST) {
     if ($_POST['action'] == 'create_tsig') {

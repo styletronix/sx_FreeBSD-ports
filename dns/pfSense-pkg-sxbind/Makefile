@@ -2,14 +2,13 @@
 
 PORTNAME=	pfSense-pkg-sxbind
 PORTVERSION=	1.1
-PORTREVISION= 2
+PORTREVISION= 3
 CATEGORIES=	dns
 MASTER_SITES=	# empty
 DISTFILES=	# empty
 EXTRACT_ONLY=	# empty
 
 RUN_DEPENDS=	bind916>=9.16.12:dns/bind916
-CONFLICTS_INSTALL= pfSense-pkg-bind
 
 MAINTAINER=	andreas.pross@styletronix.net
 COMMENT=	BIND DNS suite with updated DNSSEC and DNS64 originally forked from pfSense-pkg-bind

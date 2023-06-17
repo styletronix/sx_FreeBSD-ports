@@ -4,11 +4,7 @@ use sxbind\ZoneParser;
 /*
  * sxbind.inc
  *
- * part of pfSense (https://www.pfsense.org)
- * Copyright (c) 2015-2023 Rubicon Communications, LLC (Netgate)
- * Copyright (c) 2013 Juliano Oliveira
- * Copyright (c) 2013 Adriano Brancher
- * Copyright (c) 2013 Marcello Coutinho
+
  * All rights reserved.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,8 +36,11 @@ require_once("xmlrpc_client.inc");
 define('BIND_LOCALBASE', '/usr/local');
 define('CHROOT_LOCALBASE', '/var/etc/named');
 
-function sxbind_zone_validate($post, &$input_errors)
+function sxbind_zone_validate(&$post, &$input_errors)
 {
+	if ($post['type'] == "master" and $post['serial'] == "") {
+		$post['serial'] = (date("U") + 1000000000);
+	}
 
 	if (array_key_exists("mail", $_POST)) {
 		$_POST['mail'] = preg_replace("/@/", ".", $post['mail']);
@@ -68,28 +67,28 @@ function sxbind_zone_validate($post, &$input_errors)
 			if ($_POST['nameserver'] == '') {
 				$input_errors[] = "The field 'Name server' is required for {$_POST['type']} zones.";
 			}
-			for ($i = 0; $i < count($_POST); $i++) {
-				if (array_key_exists("hostname$i", $_POST)) {
-					if ($_POST['reverso'] == "on") {
-						$_POST["hostvalue$i"] = "";
-						if (!preg_match("/(PTR|NS)/", $_POST["hosttype$i"])) {
-							$input_errors[] = 'On reverse zones, valid record types are NS or PTR';
-						}
-					}
-					if (!preg_match("/(MX|NS)/", $_POST["hosttype$i"]) && ($_POST["hostname$i"] == "")) {
-						$input_errors[] = 'Record cannot be empty for ' . $_POST["hosttype$i"] . ' type ';
-					}
-					if ($_POST["hosttype$i"] == "MX" && ($_POST["hostvalue$i"] == "")) {
-						$_POST["hostvalue$i"] = "10";
-					}
-					if ($_POST["hosttype$i"] != "MX" && ($_POST["hostvalue$i"] != "")) {
-						$_POST["hostvalue$i"] = "";
-					}
-					if ($_POST["hostdst$i"] == "") {
-						$input_errors[] = 'Alias or IP address cannot be empty.';
-					}
-				}
-			}
+			// for ($i = 0; $i < count($_POST); $i++) {
+			// 	if (array_key_exists("hostname$i", $_POST)) {
+			// 		if ($_POST['reverso'] == "on") {
+			// 			$_POST["hostvalue$i"] = "";
+			// 			if (!preg_match("/(PTR|NS)/", $_POST["hosttype$i"])) {
+			// 				$input_errors[] = 'On reverse zones, valid record types are NS or PTR';
+			// 			}
+			// 		}
+			// 		if (!preg_match("/(MX|NS)/", $_POST["hosttype$i"]) && ($_POST["hostname$i"] == "")) {
+			// 			$input_errors[] = 'Record cannot be empty for ' . $_POST["hosttype$i"] . ' type ';
+			// 		}
+			// 		if ($_POST["hosttype$i"] == "MX" && ($_POST["hostvalue$i"] == "")) {
+			// 			$_POST["hostvalue$i"] = "10";
+			// 		}
+			// 		if ($_POST["hosttype$i"] != "MX" && ($_POST["hostvalue$i"] != "")) {
+			// 			$_POST["hostvalue$i"] = "";
+			// 		}
+			// 		if ($_POST["hostdst$i"] == "") {
+			// 			$input_errors[] = 'Alias or IP address cannot be empty.';
+			// 		}
+			// 	}
+			// }
 			break;
 		case 'slave':
 			if ($_POST['slaveip'] == "") {
@@ -121,7 +120,23 @@ function sxbind_escape_dns_string($val)
 	$replace = ['\\\\', '\\"', '\\;'];
 	return '"' . str_replace($search, $replace, $val) . '"';
 }
+function get_top_tabs()
+{
+	$active = basename($_SERVER['PHP_SELF']);
+	if ($active == 'pkg_edit.php') {
+		$active = $_REQUEST['xml'];
+	}
 
+	$tab_array = array();
+	$tab_array[] = array(gettext("Settings"), (($active == 'sxbind.xml') ? true : false), "/pkg_edit.php?xml=sxbind.xml");
+	$tab_array[] = array(gettext("ACLs"), (($active == 'sxbind_acls.xml') ? true : false), "/pkg_edit.php?xml=sxbind_acls.xml");
+	$tab_array[] = array(gettext("Views"), (($active == 'sxbind_views.xml') ? true : false), "/pkg_edit.php?xml=sxbind_views.xml");
+	$tab_array[] = array(gettext("Zones"), (($active == 'sxbind_zones.xml') ? true : false), "/pkg_edit.php?xml=sxbind_zones.xml");
+	$tab_array[] = array(gettext("Tools"), (($active == 'sxbind_tools.php') ? true : false), "/sxbind_tools.php");
+	$tab_array[] = array(gettext("Edit Zone DB"), (($active == 'sxbind_zoneEdit.php') ? true : false), "/sxbind_zoneEdit.php");
+	$tab_array[] = array(gettext("Sync"), (($active == 'sxbind_sync.xml') ? true : false), "/pkg_edit.php?xml=sxbind_sync.xml");
+	display_top_tabs($tab_array);
+}
 function sxbind_set_serial_zoneconf($zone_conf, $new_zoneserial)
 {
 	// write new serial to zone_conf.
@@ -138,62 +153,326 @@ function sxbind_set_serial_zoneconf($zone_conf, $new_zoneserial)
 	if ($serialfound) {
 		$zone_conf = $zone_conf_new;
 	} else {
-		log_error('[sxbind] Serial in zone_conf not found!');
+		log_error('[sxbind] WARNING: Serial in zone_conf not found!');
 	}
 	return $zone_conf;
 }
+function file_put_contents_if_changed($file, $content, &$changed)
+{
+	if (!file_exists($file) || file_get_contents($file) != $content) {
+		file_put_contents($file, $content);
+		$changed = true;
+		return true;
+	}
+	return false;
+}
+// function sxbind_parse_config($str)
+// {
 
-function sxbind_sync()
+// 	//$text = file_get_contents('/usr/local/etc/namedb/rndc.conf');
+// // /"(?:\\\\.|[^\\\\"])*"|(?:\\\\.*\n)|(?:\#.*\n)|(?:\/\/.*\n)|\S+/
+
+// 	//print_r($matches);
+
+
+
+// 	// get quoted word list
+// 	//$re = '/(?\'val2\'"(?:\\\\\\\\.|[^\\\\\\\\"])*")|(?\'comstart\'\/\*)|(?\'comend\'\*\/)|(?\'comment\'(?:(?:\/\/)|#).*\n|\/\*.*\*\/)|(?\'start\'{)|(?\'end\'})|(?\'val1\'[^\s;]+)|(?\'nextval\';)/';
+// 	// preg_match_all('/(?\'val2\'\"(?:\\\\\\\\.|[^\\\\\\\\\"])*\")|(?\'comstart\'\\/\\*)|(?\'comend\'\\*\\/)|(?\'comment\'(?:(?:\\/\\/)|#).*\\n|\\/\\*.*\\*\\/)|(?\'start\'{)|(?\'end\'})|(?\'val1\'[^\\s;]+)|(?\'nextval\';)/', $text, $matches);
+// 	//preg_match_all($re, $str, $matches, PREG_SET_ORDER, 0);
+
+// 	//$re = '/"(?:\\\\\\\\.|[^\\\\\\\\"])*"|[;{}]|\/\/|\/\*|#|\*\/|[^\n{; \t]+/';
+
+// 	$result = array();
+// 	$blocks = array();
+// 	$block_depth = 0;
+// 	$block_id = 0;
+// 	$in_comment_block = false;
+
+// 	$block_chain = array();
+// 	$blocks[$block_id] = array();
+// 	$cur = &$blocks[$block_id];
+// 	$block_chain[$block_depth] = &$cur;
+
+// 	$lines = explode("\n", $str);
+
+// 	foreach ($lines as $line) {
+// 		preg_match_all($re, $line, $matches, PREG_SET_ORDER, 0);
+// 		foreach ($matches as $words) {
+// 			$word = $words[0];
+// 			if ($in_comment_block && $word == '*/') {
+// 				// end of comment block
+// 				$in_comment_block = false;
+// 				continue;
+// 			}
+
+// 			if ($word == '//' || $word == '#') {
+// 				// skip line with comments
+// 				continue 2;
+// 			}
+
+// 			if ($word == '/*') {
+// 				// start of comment block
+// 				$in_comment_block = true;
+// 				continue;
+// 			}
+
+// 			if ($in_comment_block) {
+// 				continue;
+// 			}
+
+// 			if ($word == '{') {
+// 				// start of block
+// 				$block_depth++;
+// 				$block_id++;
+// 				$blocks[$block_id] = array();
+// 				$block_chain[$block_depth] = &$blocks[$block_id];
+// 				$block_chain[$block_depth - 1][] = &$blocks[$block_id];
+// 				continue;
+// 			}
+
+// 			if ($word == '}') {
+// 				// end of block
+// 				$block_depth--;
+// 				$cur = &$block_chain[$block_depth];
+// 				continue;
+// 			}
+
+// 			if ($word == ';') {
+// 				// end of value
+// 				$block_id++;
+// 				$blocks[$block_id] = array();
+// 				$cur[] = &$blocks[$block_id];
+// 				continue;
+// 			}
+
+
+// 			if (count_chars($word) > 0) {
+// 				$blocks[$block_id][] = $word;
+// 			}
+// 		}
+// 	}
+// 	//print_r($blocks);
+// 	return $block_chain[0];
+// }
+
+// Array
+// (
+//     [0] => Array
+//         (
+//             [0] => key
+//             [1] => "rndc-key"
+//             [2] => {
+//             [3] => algorithm
+//             [4] => hmac-sha256;
+//             [5] => secret
+//             [6] => "Gfqkdz7fAC4zJD/As/dD8GlGY1HOQm3ZXbBpqYR4oKI="
+//             [7] => ;
+//             [8] => };
+//             [9] => options
+//             [10] => {
+//             [11] => default-key
+//             [12] => "rndc-key"
+//             [13] => ;
+//             [14] => default-server
+//             [15] => 127.0.0.1;
+//             [16] => default-port
+//             [17] => 8953;
+//             [18] => };
+//         )
+
+// )
+//}
+// function sxbind_set_config_value($data, $config_path, $value)
+// {
+// 	$result = [];
+
+// 	$index = 0;
+// 	$result_index = 0;
+
+// 	foreach (explode("\n", $data) as $line) {
+// 		$remaining_str = $line;
+// 		$result[$result_index] = '';
+// 		$trimmed = ltrim($remaining_str);
+
+// 		while (count_chars($trimmed) > 0) {
+// 			if (str_starts_with($trimmed, $config_path[$index])) {
+// 				$opt_name_length = count_chars($config_path[$index]) + count_chars($remaining_str) - count_chars($trimmed);
+// 				$result[$result_index] .= substr($remaining_str, 0, $opt_name_length);
+// 				$index++;
+
+// 				if ($index == count($config_path)) {
+// 					$result[$result_index] .= substr($remaining_str, 0, $opt_name_length);
+
+// 				} else {
+// 					$result[$result_index] .= ' ';
+// 				}
+// 			}
+// 		}
+
+// 		if (str_ends_with($remaining_str, '}')) {
+// 			$index--;
+// 		}
+
+
+// 		$result[$result_index] .= $remaining_str;
+// 		$result_index++;
+// 	}
+
+// 	return implode("\n", $result);
+// }
+
+function sxbind_rndc_config_setval($str, $name, $value, &$changed)
+{
+	switch ($name) {
+		case 'controls/inet/port':
+			$re = '/^\s?(?:controls\s*\{[\s\S]*?inet.*?port\s)\K(.*)(?=[\s\S]+)/m';
+			break;
+		case 'options/default-port':
+			$re = '/^\s?(?:options\s*\{[\s\S]*?default-port\s)\K([^;\s]*)(?=[\s\S]+)/m';
+			break;
+		default:
+			throw new Exception('Option not supported');
+	}
+	$count = 0;
+	preg_match($re, $str, $matches);
+	if ($matches[0] != $value) {
+		log_error('[SXBIND] INFO - change ' . $name . ' from ' . $matches[0] . ' to ' . $value);
+		$str = preg_replace($re, $value, $str, 1, $count);
+		if ($count == 0) {
+			log_error('[SXBIND] ERROR - change of ' . $name . ' failed.');
+			return null;
+		}
+		$changed = true;
+	}
+
+	return $str;
+}
+/**
+ * Change or add TSIG Key to rndc.conf or named.conf.
+ * @param mixed $str	The current config file content
+ * @param mixed $key_string	The new Key as produced by tsig-keygen.
+ * @return array|string|null	Returns null if failed or the new config file content.
+ */
+function sxbind_change_or_add_key($str, $key_string, &$changed)
+{
+	$re = '/key\s*\"(.*)\"\s*\{[\s\S]*?\}\s*;?/m';
+	preg_match($re, $key_string, $matches);
+	if (empty($matches)) {
+		$error = "[sxbind] ERROR - tsig-key was not found in parameters";
+		log_error($error);
+		return null;
+	}
+
+	$key = $matches[0];
+	$key_name = $matches[1];
+	if (empty($key) || empty($key_name)) {
+		$error = "[sxbind] ERROR - tsig-key was not found in parameters";
+		log_error($error);
+		return null;
+	}
+
+	$re = '/key\s*\"' . preg_quote($key_name) . '\"\s*\{[\s\S]*?\}\s*?;?/m';
+	preg_match($re, $str, $matches);
+	if ($matches[0] != $key) {
+		$error = "[sxbind] INFO - tsig-key has changed";
+		log_error($error);
+		$changed = true;
+		$str = preg_replace($re, $key, $str, 1, $count);
+		if ($count == 0) {
+			$error = "[sxbind] INFO - TSIG Key was not found. Key will be added.";
+			log_error($error);
+			$str .= "\n\n" . $key . "\n";
+		}
+	}
+	return $str;
+}
+function sxbind_get_key($str, $key_name)
+{
+	$re = '/key\s*\"' . preg_quote($key_name) . '\"\s*\{[\s\S]*?\}\s*;?/m';
+	preg_match($re, $str, $matches);
+	if (empty($matches)) {
+		return null;
+	} else {
+		return $matches[0];
+	}
+}
+/**
+ *Removes a TSIG-Key from rndc.conf or named.conf.
+ * @param mixed $str	The current config file content
+ * @param mixed $key_name	The name of the Key to remove without quotes.
+ * @return array|string|null	Returns null if failed or the new config file content.
+ */
+function sxbind_remove_key($str, $key_name, &$changed)
+{
+	$re = '/^\s?key \"' . preg_quote($key_name) . '\" \{[\s\S]+?\}\s?;?/m';
+	$ret = preg_replace($re, '', $str, 1, $count);
+	if ($count == 0) {
+		return null;
+	} else {
+		$changed = true;
+		return $ret;
+	}
+}
+function sxbind_create_rndc_conf_file($force = false, &$new_rndc_key = null, &$changed = false)
 {
 	global $config;
-	$named_process = "named";
 	$bind = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bind']['config'][0];
-	// Create rndc
-	$rndc_confgen = "/usr/local/sbin/rndc-confgen";
+	$rndc_file = BIND_LOCALBASE . '/etc/rndc.conf';
 	$rndc_port = $bind['controlport'] == "" ? "8953" : $bind['controlport'];
-	$rndc_confgen_opts = "-p " . escapeshellarg($rndc_port);
-	if (!file_exists(BIND_LOCALBASE . "/etc/rndc-confgen.pfsense") && file_exists($rndc_confgen)) {
-		exec("$rndc_confgen $rndc_confgen_opts ", $rndc_conf);
-		$confgen_file = "";
-		foreach ($rndc_conf as $line) {
-			$confgen_file .= "{$line}\n";
-		}
-		file_put_contents(BIND_LOCALBASE . "/etc/rndc-confgen.pfsense", $confgen_file);
-	}
-	$rndc_bindconf = "";
-	$rndc_file_changed = false;
-	$rndc_file = "";
-	if (file_exists(BIND_LOCALBASE . "/etc/rndc-confgen.pfsense")) {
-		$rndc_conf = file(BIND_LOCALBASE . "/etc/rndc-confgen.pfsense");
-		$confgen = "rndc.conf";
-		foreach ($rndc_conf as $line) {
-			if (preg_match("/\bport \d+\b/", $line)) {
-				$line = preg_replace("/\bport \d+\b/", "port {$rndc_port}", $line);
-			}
-			if ($confgen == "rndc.conf") {
-				if (!preg_match("/^#/", $line)) {
-					$rndc_file .= $line;
-				}
-			} else {
-				if (!preg_match("/named.conf/", $line)) {
-					$rndc_bindconf .= preg_replace('/#/', "", $line);
-				}
-			}
-			if (preg_match("/named.conf/", $line)) {
-				$confgen = "named.conf";
-				file_put_contents(BIND_LOCALBASE . "/etc/rndc.conf", $rndc_file);
-				$rndc_file_changed = true;
-				@symlink(BIND_LOCALBASE . "/etc/rndc.conf", BIND_LOCALBASE . "/etc/namedb/rndc.conf");
+
+	if (file_exists($rndc_file) && $force == false) {
+		$rndc_conf = file_get_contents($rndc_file);
+
+		$rndc_conf = sxbind_rndc_config_setval($rndc_conf, 'options/default-port', $rndc_port, $changed);
+		if ($rndc_conf && $new_rndc_key) {
+			$rndc_conf = sxbind_change_or_add_key($rndc_conf, $new_rndc_key, $changed);
+		} else {
+
+			$new_rndc_key = sxbind_get_key($rndc_conf, 'rndc-key');
+			if (!$new_rndc_key) {
+				$error = "[sxbind] INFO - rndc-key will be created because it is missing.";
+				log_error($error);
+				$new_rndc_key = ZoneParser::create_tsig_key('rndc-key');
+				$rndc_conf = sxbind_change_or_add_key($rndc_conf, $new_rndc_key, $changed);
 			}
 		}
 	}
 
-	if (is_array($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone'])) {
-		$bindzone = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'];
-	} else {
-		$bindzone = array();
+	if ($force || !file_exists($rndc_file) || !$rndc_conf) {
+		$error = "[sxbind] INFO - rndc.conf will be created because it is missing or the creation was forced.";
+		log_error($error);
+
+		$rndc_conf = '';
+		$changed = true;
+
+		if ($new_rndc_key == null) {
+			$new_rndc_key = ZoneParser::create_tsig_key('rndc-key');
+		}
+		$rndc_conf .= "\n" . $new_rndc_key . "\n\n";
+
+		$rndc_conf .= <<<EOD
+options {
+	default-key "rndc-key";
+	default-server localhost;
+	default-port {$rndc_port};
+};
+EOD;
+
 	}
-	$bind_enable = $bind['enable_bind'];
+
+	if ($rndc_conf) {
+		file_put_contents_if_changed($rndc_file, $rndc_conf, $changed);
+		file_put_contents_if_changed(CHROOT_LOCALBASE . '/etc/namedb/rndc.conf', $rndc_conf, $changed);
+		@symlink($rndc_file, BIND_LOCALBASE . "/etc/namedb/rndc.conf");
+	}
+
+	return $rndc_conf;
+}
+function sxbind_create_bind_conf(&$bind, $rndc_key, &$changed)
+{
+	global $config;
+	$rndc_port = $bind['controlport'] == "" ? "8953" : $bind['controlport'];
 	$bind_dnssec_validation = $bind['bind_dnssec_validation'];
 	$bind_forwarder = $bind['bind_forwarder'];
 	$forwarder_ips = $bind['bind_forwarder_ips'];
@@ -203,9 +482,18 @@ function sxbind_sync()
 	$custom_options = base64_decode($bind['bind_custom_options']);
 	$bind_global_settings = base64_decode($bind['bind_global_settings']);
 	$bind_logging = $bind['bind_logging'];
-	$bind_conf = "#Bind pfsense configuration\n";
-	$bind_conf .= "#Do not edit this file!!!\n\n";
-	$bind_conf .= "{$rndc_bindconf}\n";
+
+	$bind_conf = <<<EOD
+# Bind pfsense configuration
+# Do not edit this file!
+
+{$rndc_key}
+
+controls {
+	inet 127.0.0.1 port {$rndc_port}
+		allow { 127.0.0.1; ::1; } keys { "rndc-key"; };
+};
+EOD;
 	$bind_conf .= "{$bind_global_settings}\n";
 	// Curly braces in the following <<<EOD are PHP {$variable}, not named.conf text { value; }
 	$bind_conf .= <<<EOD
@@ -268,8 +556,6 @@ EOD;
 	}
 	$bind_listenonv6 = $bind_listenonv6 == "" ? "none;" : $bind_listenonv6;
 	$bind_listenon = $bind_listenon == "" ? "none;" : $bind_listenon;
-	// Print "<pre>$bind_listenonv6 $bind_listenon";
-
 	$bind_listenport = $bind['listenport'] == "" ? "53" : $bind['listenport'];
 	if (array_key_exists("ipv6allow", $config['system'])) {
 		$bind_conf .= "\tlisten-on-v6 port {$bind_listenport} { {$bind_listenonv6} };\n";
@@ -298,14 +584,15 @@ EOD;
 		if (pf_version() < "2.3.3") {
 			// Check if bind is included on syslog
 			$syslog_files = array("/etc/inc/system.inc", "/var/etc/syslog.conf");
-			$restart_syslog = 0;
+			$restart_syslog = false;
 			foreach ($syslog_files as $syslog_file) {
 				$syslog_file_data = file_get_contents($syslog_file);
 				if (!preg_match("/dnsmasq,named,filterdns/", $syslog_file_data) || !preg_match("/'dnsmasq','named','filterdns'/", $syslog_file_data)) {
 					$syslog_file_data = preg_replace("/dnsmasq,filterdns/", "dnsmasq,named,filterdns", $syslog_file_data);
 					$syslog_file_data = preg_replace("/'dnsmasq','filterdns'/", "'dnsmasq','named','filterdns'", $syslog_file_data);
-					file_put_contents($syslog_file, $syslog_file_data);
-					$restart_syslog++;
+					if (file_put_contents_if_changed($syslog_file, $syslog_file_data, $changed)) {
+						$restart_syslog = true;
+					}
 				}
 			}
 			if ($restart_syslog > 0) {
@@ -338,41 +625,26 @@ EOD;
 	}
 	$bind_conf .= "\n\n";
 
-	// Config Zone domain
-
-	// Add ACLS
-	if (!is_array($config['installedpackages']['sxbindacls']) || !is_array($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'])) {
-		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
-			array("name" => "none", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
-			array("name" => "any", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
-			array("name" => "localhost", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
-			array("name" => "localnets", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		write_config("Created BIND Built-in ACLs");
-	}
-	$bindacls = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'];
+	return $bind_conf;
+}
+function sxbind_append_acl_to_bind_conf(&$conf, &$bindacls)
+{
 	for ($i = 0; $i < sizeof($bindacls); $i++) {
 		$aclname = $bindacls[$i]['name'];
 		$aclhost = $bindacls[$i]['row'];
 		if (($aclname != "none") && ($aclname != "any") && ($aclname != "localhost") && ($aclname != "localnets")) {
-			$bind_conf .= "acl \"{$aclname}\" {\n";
+			$conf .= "acl \"{$aclname}\" {\n";
 			for ($u = 0; $u < sizeof($aclhost); $u++) {
 				$aclhostvalue = $aclhost[$u]['value'];
-				$bind_conf .= "\t{$aclhostvalue};\n";
+				$conf .= "\t{$aclhostvalue};\n";
 			}
-			$bind_conf .= "};\n\n";
+			$conf .= "};\n\n";
 		}
 	}
-
-	// Add Views
-	if (is_array($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindviews'])) {
-		$bindview = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindviews']['config'];
-	} else {
-		$bindview = array();
-	}
-
+}
+function sxbind_append_views_to_bind_conf(&$bind_conf, &$bindview, $bindzone)
+{
+	global $config;
 
 	for ($i = 0; $i < sizeof($bindview); $i++) {
 		$views = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindviews']['config'][$i];
@@ -418,7 +690,6 @@ EOD;
 		$bind_conf .= "\n";
 
 		// Add Zones in View
-		$write_config = 0;
 		$custom_root_zone = false;
 		for ($x = 0; $x < sizeof($bindzone); $x++) {
 			$zone = $bindzone[$x];
@@ -437,9 +708,6 @@ EOD;
 			if (!empty($zoneforwarders)) {
 				$zoneforwarders = rtrim($zoneforwarders, ';');
 			}
-			$zonereverso = $zone['reverso'];
-			$zonereversv6o = $zone['reversv6o'];
-			$zonerpz = (isset($zone["rpz"]) && ($zone["rpz"] === "on"));
 			// Ensure zone view folder exists
 			if ($zonetype != "forward") {
 				foreach ($zoneviewlist as $zoneview) {
@@ -470,12 +738,12 @@ EOD;
 			if (in_array($viewname, $zoneviewlist)) {
 				$zoneview = $viewname;
 				// Add zone name
-				$bind_conf .= "\tzone \"" . reverse_zonename($zonename, $zonereverso, $zonereversv6o) . "\" {\n";
+				$bind_conf .= "\tzone \"" . reverse_zonename($zone['name'], $zone['reverso'], $zone['reversv6o']) . "\" {\n";
+				$bind_conf .= "\t\ttype {$zone['type']};\n";
 
-				$bind_conf .= "\t\ttype {$zonetype};\n";
 				// Add zone file (if not forwarder)
-				if ($zonetype != "forward") {
-					$bind_conf .= "\t\tfile \"/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB\";\n";
+				if ($zone['type'] != "forward") {
+					$bind_conf .= "\t\tfile \"/etc/namedb/{$zone['type']}/{$zoneview}/{$zone['name']}.DB\";\n";
 				}
 
 				// Add zone statements
@@ -498,6 +766,7 @@ EOD;
 							$bind_conf .= "\t\tinline-signing yes;\n\n";
 						}
 						break;
+
 					case 'slave':
 						$bind_conf .= "\t\tmasters { $zoneipslave; };\n";
 						$bind_conf .= "\t\tallow-query { $zoneallowquery; };\n";
@@ -505,16 +774,19 @@ EOD;
 							$bind_conf .= "\t\tallow-transfer { $zoneallowtransfer; };\n";
 						}
 						break;
+
 					case 'forward':
 						$bind_conf .= "\t\tforward only;\n";
 						$bind_conf .= "\t\tforwarders { $zoneforwarders; };\n";
 						break;
+
 					case 'redirect':
 						$bind_conf .= "\t\t# While using redirect zones, NXDOMAIN Redirection will not override DNSSEC\n";
 						$bind_conf .= "\t\t# If the client has requested DNSSEC records (DO=1) and the NXDOMAIN response is signed then no substitution will occur\n";
 						$bind_conf .= "\t\t# https://kb.isc.org/article/AA-00376/192/BIND-9.9-redirect-zones-for-NXDOMAIN-redirection.html\n";
 						$bind_conf .= "\t\tallow-query { $zoneallowquery; };\n";
 						break;
+
 					default:
 						break;
 				}
@@ -525,6 +797,103 @@ EOD;
 				}
 
 				$bind_conf .= "\t};\n\n";
+			}
+		}
+
+		if (!$custom_root_zone && ($bind_forwarder != 'on')) {
+			$bind_conf .= "\tzone \".\" {\n";
+			$bind_conf .= "\t\ttype hint;\n";
+			$bind_conf .= "\t\tfile \"/etc/namedb/named.root\";\n";
+			$bind_conf .= "\t};\n\n";
+		}
+
+		$bind_conf .= "};\n";
+	}
+}
+
+function sxbind_sync()
+{
+	global $config;
+	$config_changed = false;
+	$named_process = "named";
+	$bind = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bind']['config'][0];
+	$bind_enable = $bind['enable_bind'];
+
+	// Create rndc.conf file
+	sxbind_create_rndc_conf_file(false, $rndc_key, $config_changed);
+
+	//create named.conf string
+	$bind_conf = sxbind_create_bind_conf($bind, $rndc_key, $config_changed);
+
+	if (is_array($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone'])) {
+		$bindzone = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'];
+	} else {
+		$bindzone = array();
+	}
+	// Add ACLS to config
+	if (!is_array($config['installedpackages']['sxbindacls']) || !is_array($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'])) {
+		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
+			array("name" => "none", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
+		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
+			array("name" => "any", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
+		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
+			array("name" => "localhost", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
+		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
+			array("name" => "localnets", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
+		write_config("Created BIND Built-in ACLs");
+		$config_changed = true;
+	}
+
+	$bindacls = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'];
+	sxbind_append_ACL_to_bind_conf($bind_conf, $bindacls);
+
+	// Add Views
+	if (is_array($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindviews'])) {
+		$bindview = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindviews']['config'];
+	} else {
+		$bindview = array();
+	}
+	sxbind_append_views_to_bind_conf($bind_conf, $bindview, $bindzone);
+
+	for ($i = 0; $i < sizeof($bindview); $i++) {
+		$views = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindviews']['config'][$i];
+		$viewname = $views['name'];
+
+		// Add Zones in View
+		$write_config = 0;
+		$custom_root_zone = false;
+		for ($x = 0; $x < sizeof($bindzone); $x++) {
+			$zone = $bindzone[$x];
+			if ($zone['disabled'] == "on") {
+				continue;
+			}
+			$zonename = $zone['name'];
+			if ($zonename == ".") {
+				$custom_root_zone = true;
+			}
+			$zonetype = $zone['type'];
+			$zoneviewlist = explode(',', $zone['view']);
+			$zoneforwarders = $zone['forwarders'];
+			if (!empty($zoneforwarders)) {
+				$zoneforwarders = rtrim($zoneforwarders, ';');
+			}
+			$zonereverso = $zone['reverso'];
+			$zonereversv6o = $zone['reversv6o'];
+			$zonerpz = (isset($zone["rpz"]) && ($zone["rpz"] === "on"));
+			// Ensure zone view folder exists
+			if ($zonetype != "forward") {
+				foreach ($zoneviewlist as $zoneview) {
+					safe_mkdir(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}", 0755);
+				}
+			}
+
+			$zoneupdatepolicy = $zone['updatepolicy'];
+			if (!empty($zoneupdatepolicy)) {
+				$zoneupdatepolicy = rtrim($zoneupdatepolicy, ';');
+			}
+
+			if (in_array($viewname, $zoneviewlist)) {
+				$zoneview = $viewname;
 
 				// Create zone config DB file
 				switch ($zonetype) {
@@ -533,6 +902,7 @@ EOD;
 						// Check/update slave dir permission
 						chown(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}", "bind");
 						chown(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}", "bind");
+
 						$zonetll = $zone['tll'] ? $zone['tll'] : "43200";
 						$zonemail = $zone['mail'] ? $zone['mail'] : "zonemaster.{$zonename}";
 						$zonemail = $zonerpz ? "root.localhost" : preg_replace("/@/", ".", $zonemail);
@@ -541,7 +911,8 @@ EOD;
 						$zoneretry = $zone['retry'] ? $zone['retry'] : "600";
 						$zoneexpire = $zone['expire'] ? $zone['expire'] : "86400";
 						$zoneminimum = $zone['minimum'] ? $zone['minimum'] : "3600";
-						$zonenameserver = $zonerpz ? "localhost" : $zone['nameserver'];
+						$zonenameserver = rtrim($zonerpz ? "localhost" : $zone['nameserver'], '.');
+						$zonenameserverip = $zonerpz ? "" : $zone['nameserverip'];
 						$zoneipns = $zonerpz ? "" : $zone['ipns'];
 						$zonereverso = $zone['reverso'];
 						$zonereversv6o = $zone['reversv6o'];
@@ -565,30 +936,17 @@ EOD;
 
 						if ($zonereverso == "on") {
 							$zone_conf .= "\t IN NS \t{$zonenameserver}.\n";
+							$zone_conf .= "{$zoneipns}. IN PTR {$zonenameserver}.\n";
 						} else {
 							$zone_conf .= "@ \t IN NS \t{$zonenameserver}.\n";
 							if ($zoneipns != "") {
 								$zone_conf .= "@ \t IN A \t{$zoneipns}\n";
 							}
-						}
-						for ($y = 0; $y < sizeof($zone['row']); $y++) {
-							$hosttype = $zone['row'][$y]['hosttype'];
-							$hostname = $zone['row'][$y]['hostname'];
-							if (preg_match("/(MX|NS)/", $zone['row'][$y]['hosttype']) && ($hostname == "")) {
-								$hostname = "@";
+							if (is_ipaddrv6($zonenameserverip)) {
+								$zone_conf .= "{$zonenameserver}. IN AAAA {$zonenameserverip}\n";
+							} elseif (is_ipaddr($zonenameserverip)) {
+								$zone_conf .= "{$zonenameserver}. IN A {$zonenameserverip}\n";
 							}
-							$hostdst = $zone['row'][$y]['hostdst'];
-							if (preg_match("/[a-zA-Z]/", $hostdst) && !preg_match("/(TXT|SPF|AAAA)/", $hosttype)) {
-								$hostdst .= ".";
-							}
-							if (preg_match("/(TXT|SPF)/", $hosttype)) {
-								if (!str_starts_with(trim($hostdst), '"')) {
-									$str = mb_str_split(sxbind_escape_dns_string($hostdst), 127, 'UTF-8');
-									$hostdst = implode('" "', array_filter($str, 'strlen'));
-								}
-							}
-							$hostvalue = $zone['row'][$y]['hostvalue'];
-							$zone_conf .= "{$hostname} \t IN {$hosttype} {$hostvalue} \t{$hostdst}\n";
 						}
 
 						// Register DHCP static mappings
@@ -629,11 +987,6 @@ EOD;
 							}
 						}
 
-						// Add custom zone records
-						if ($zone['customzonerecords'] != "") {
-							$zone_conf .= "\n\n;\n;custom zone records\n;\n" . base64_decode($zone['customzonerecords']) . "\n";
-						}
-
 						// Detect Zone changes
 						$skipZoneUpdate = false;
 						$diff = [];
@@ -649,6 +1002,7 @@ EOD;
 						} else {
 							$zoneRows_cached_config = [];
 						}
+
 						// new records
 						$zoneRows_new_config = ZoneParser::parse_rndc_zone_dump($zone_conf, $zonename_reverse);
 						// removed records
@@ -658,7 +1012,7 @@ EOD;
 						if ($zoneCacheString == $zone_conf) {
 							// no change in zone config. skip entire zone update.
 							$skipZoneUpdate = true;
-							log_error("[sxbind] INFO - Config file for zone {$zonename} skipped cause nothing changed.");
+							log_error("[sxbind] INFO: Config file for zone {$zonename} skipped cause nothing changed.");
 						}
 
 						if (!$skipZoneUpdate) {
@@ -686,7 +1040,7 @@ EOD;
 							if (file_exists($zonefile)) {
 								$current_zone_data_parsed = ZoneParser::get_zone_dump_parsed($zonetype, $zoneview, $zonename_reverse);
 								if (!$current_zone_data_parsed) {
-									$error = "[sxbind] FAILED to parse current zone data of zone {$zonename_reverse} .To prevent loose , the Zone remains in the old state. Manual resolve any errors in zone file or performe a reset on the zone from the zone config to fix this issue.\n\n";
+									$error = "[sxbind] ERROR: Failed to parse current zone data of zone {$zonename_reverse} .To prevent loose , the Zone remains in the old state. Manual resolve any errors in zone file or performe a reset on the zone from the zone config to fix this issue.\n\n";
 									file_notice("named_config", $error, "sxbind DNS", "", 2);
 									log_error($error);
 
@@ -705,7 +1059,7 @@ EOD;
 										$zone_conf_dynamic .= ZoneParser::zone_record_to_string($row) . "\n";
 									}
 								}
-								log_error('[sxbind] ZONE ' . $zonename_reverse . ' : ' . count($current_zone_data_parsed) . ' Records in DB. ' . count($zonedata_to_merge) . ' Records to keep from DB. ' . count($zoneRows_new_config) . ' Records to add from Config.');
+								log_error('[sxbind] INFO: ZONE ' . $zonename_reverse . ' : ' . count($current_zone_data_parsed) . ' Records in DB. ' . count($zonedata_to_merge) . ' Records to keep from DB. ' . count($zoneRows_new_config) . ' Records to add from Config.');
 							}
 
 							//Increment serial 
@@ -730,7 +1084,7 @@ EOD;
 
 							if ($result['success']) {
 								/* Validation successfull
-																																																			Save zone_conf to cache file for comparison on next update. */
+																																																																																																																																																																																							Save zone_conf to cache file for comparison on next update. */
 								file_put_contents($zone_cache_file, $zone_conf_orig);
 								$data = base64_encode($zone_conf . $zone_conf_dynamic);
 								if ($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x]['resultconfig'] != $data) {
@@ -740,7 +1094,7 @@ EOD;
 
 							} else {
 								// Validation failed. Keep old zone DB and send error notice.
-								$error = "[sxbind] VALIDATION FAILED - Zone {$zonename_reverse} not saved. Code {$result['result_code']}\n" . $result['message'];
+								$error = "[sxbind] VALIDATION FAILED: Zone {$zonename_reverse} not saved. Code {$result['result_code']}\n" . $result['message'];
 								file_notice("named_config", $error, "sxbind DNS", "", 2);
 								log_error($error);
 							}
@@ -749,7 +1103,7 @@ EOD;
 								// Thaw frozen zone
 								$result = ZoneParser::thaw_zone($zoneview, $zonename_reverse);
 								if (!$result['success']) {
-									$error = "[sxbind] RNDC THAW throwed an exception. Zone {$zonename_reverse} may still be frozen. Code {$result['result_code']}\n" . $result['message'];
+									$error = "[sxbind] WARNING: RNDC THAW throwed an exception. Zone {$zonename_reverse} may still be frozen. Code {$result['result_code']}\n" . $result['message'];
 									log_error($error);
 									file_notice("named_config", $error, "sxbind DNS", "", 1);
 								}
@@ -784,7 +1138,7 @@ EOD;
 									}
 								}
 								if ($key_restored > 0) {
-									log_error("[sxbind] {$key_restored} DNSSEC keys restored from XML backup for {$zonename} zone.");
+									log_error("[sxbind] DNSSEC RESTORED: {$key_restored} DNSSEC keys restored from XML backup for {$zonename} zone.");
 								}
 								$dnssec_bin = "/usr/local/sbin/dnssec-keygen";
 								$z = reverse_zonename($zonename, $zonereverso, $zonereversv6o);
@@ -795,7 +1149,7 @@ EOD;
 										chown(CHROOT_LOCALBASE . "/etc/namedb/keys/{$filename}.key", "bind");
 										chown(CHROOT_LOCALBASE . "/etc/namedb/keys/{$filename}.private", "bind");
 									}
-									log_error("[sxbind] DNSSEC keys for {$zonename} created.");
+									log_error("[sxbind] DNSSEC CREATED: DNSSEC keys for {$zonename} created.");
 								}
 							}
 							// Get DS keys
@@ -837,7 +1191,7 @@ EOD;
 									}
 								}
 								if ($dnssec_keys > 0) {
-									log_error("[sxbind] {$dnssec_keys} DNSSEC keys for {$zonename} zone saved on XML config.");
+									log_error("[sxbind] DNSSEC SAVED: {$dnssec_keys} DNSSEC keys for {$zonename} zone saved on XML config.");
 								}
 							}
 						}
@@ -883,16 +1237,9 @@ EOD;
 				}
 			}
 		}
-		if (!$custom_root_zone && ($bind_forwarder != 'on')) {
-			$bind_conf .= "\tzone \".\" {\n";
-			$bind_conf .= "\t\ttype hint;\n";
-			$bind_conf .= "\t\tfile \"/etc/namedb/named.root\";\n";
-			$bind_conf .= "\t};\n\n";
-		}
 		if ($write_config > 0) {
 			write_config("sxbind: Saved resulting config file for zone in xml");
 		}
-		$bind_conf .= "};\n";
 	}
 	$dirs = array("/etc/namedb/keys", "/var/run/named", "/var/dump", "/var/log", "/var/stats", "/dev");
 	foreach ($dirs as $dir) {
@@ -910,16 +1257,17 @@ EOD;
 		}
 		exec("/sbin/devfs -m {$bind_dev_dir} rule applyset", $dout);
 	}
+
 	// Handle /usr/local/lib/named for chroot
 	$bind_plugin_dir = CHROOT_LOCALBASE . BIND_LOCALBASE . "/lib/named";
 	rmdir_recursive($bind_plugin_dir);
 	safe_mkdir($bind_plugin_dir, 0755);
+
 	foreach (glob(BIND_LOCALBASE . "/lib/named/*.so") as $bind_plugin) {
 		copy($bind_plugin, CHROOT_LOCALBASE . $bind_plugin);
 	}
 	// http://www.unixwiz.net/techtips/bind9-chroot.html
-	file_put_contents(CHROOT_LOCALBASE . '/etc/namedb/named.conf', $bind_conf);
-	file_put_contents(CHROOT_LOCALBASE . '/etc/namedb/rndc.conf', $rndc_file);
+	file_put_contents_if_changed(CHROOT_LOCALBASE . '/etc/namedb/named.conf', $bind_conf, $config_changed);
 
 	if (!file_exists(CHROOT_LOCALBASE . "/etc/namedb/named.root")) {
 		$curl_session = curl_init();
@@ -933,12 +1281,15 @@ EOD;
 		}
 		curl_close($curl_session);
 		file_put_contents(CHROOT_LOCALBASE . "/etc/namedb/named.root", $named_root, LOCK_EX);
+		$config_changed = true;
 	}
 	if (!file_exists(CHROOT_LOCALBASE . "/etc/localtime")) {
 		copy("/etc/localtime", CHROOT_LOCALBASE . "/etc/localtime");
+		$config_changed = true;
 	}
 
 	sxbind_write_rcfile();
+
 	chown(CHROOT_LOCALBASE . "/etc/namedb/keys", "bind");
 	chown(CHROOT_LOCALBASE . "/etc/namedb", "bind");
 	chown(CHROOT_LOCALBASE . "/var/log", "bind");
@@ -948,14 +1299,19 @@ EOD;
 
 	if ($bind_enable == "on") {
 		chmod($bind_sh, 0755);
-		if (is_process_running($named_process)) {
-			exec("{$rndc} reconfig" . ' 2>&1', $output, $retval);
-			if ($retval !== 0) {
-				// restart service as Fallback to rndc reload
-				log_error("[sxbind] WARNING \"RNDC reconfig\" CODE {$retval}:\n" . implode("\n", $output));
-				restart_service("named");
-				log_error("[sxbind] service restarted because reconfig throwed an exception.");
+		if (!$restart_required && is_process_running($named_process)) {
+			if ($config_changed) {
+				exec("{$rndc} reload" . ' 2>&1', $output, $retval);
+				if ($retval !== 0) {
+					// restart service as Fallback to rndc reload
+					log_error("[sxbind] WARNING: \"RNDC reload\" CODE {$retval}:\n" . implode("\n", $output));
+					restart_service("named");
+					log_error("[sxbind] RESTART SERVICE: service restarted because reconfig throwed an exception.");
+				}
+			} else {
+				log_error("[sxbind] INFO: Reload of BIND skipped because no changes detected.");
 			}
+
 		} else {
 			restart_service("named");
 		}
@@ -966,7 +1322,6 @@ EOD;
 	// Sync to backup servers
 	sxbind_sync_on_changes();
 }
-
 
 function sxbind_print_javascript_type_zone()
 {
@@ -1219,7 +1574,7 @@ function sxbind_sync_on_changes()
 				if (is_array($bind_sync['row'])) {
 					$rs = $bind_sync['row'];
 				} else {
-					log_error("[sxbind] XMLRPC sync is enabled but there are no hosts to push on BIND config.");
+					log_error("[sxbind] WARNING: XMLRPC sync is enabled but there are no hosts to push on BIND config.");
 					return;
 				}
 				break;
@@ -1240,13 +1595,13 @@ function sxbind_sync_on_changes()
 						$rs[0]['syncport'] = $config['system']['webgui']['port'] ?: '443';
 					}
 					if ($hasync['synchronizetoip'] == "") {
-						log_error("[sxbind] XMLRPC CARP/HA sync is enabled but there are no system backup hosts configured as replication targets.");
+						log_error("[sxbind] WARNING: XMLRPC CARP/HA sync is enabled but there are no system backup hosts configured as replication targets.");
 						return;
 					} else {
 						$rs[0]['syncdestinenable'] = TRUE;
 					}
 				} else {
-					log_error("[sxbind] XMLRPC sync is enabled but there are no system backup hosts to push BIND config.");
+					log_error("[sxbind] WARNING: XMLRPC sync is enabled but there are no system backup hosts to push BIND config.");
 					return;
 				}
 				break;
@@ -1254,7 +1609,7 @@ function sxbind_sync_on_changes()
 				return;
 		}
 		if (is_array($rs)) {
-			log_error("[sxbind] XMLRPC sync is starting.");
+			log_error("[sxbind] INFO: XMLRPC sync is starting.");
 			foreach ($rs as $sh) {
 				// Only sync enabled replication targets
 				if ($sh['syncdestinenable']) {
@@ -1305,19 +1660,12 @@ function sxbind_sync_on_changes()
 					if ($valid) {
 						sxbind_do_xmlrpc_sync($sync_to_ip, $port, $protocol, $username, $password, $synctimeout, $master_zone_ip);
 					} else {
-						log_error("[sxbind] XMLRPC sync with '{$sync_to_ip}' aborted due to the following error(s): {$error}");
+						log_error("[sxbind] ERROR: XMLRPC sync with '{$sync_to_ip}' aborted due to the following error(s): {$error}");
 					}
 				}
 			}
-			log_error("[sxbind] XMLRPC sync completed.");
+			log_error("[sxbind] INFO: XMLRPC sync completed.");
 		}
-	}
-}
-
-if (!function_exists('pf_version')) {
-	function pf_version()
-	{
-		return substr(trim(file_get_contents("/etc/version")), 0, 3);
 	}
 }
 
@@ -1327,7 +1675,7 @@ function sxbind_do_xmlrpc_sync($sync_to_ip, $port, $protocol, $username, $passwo
 	global $config, $g;
 
 	if (($username == "") || ($password == "") || ($sync_to_ip == "") || ($port == "") || ($protocol == "") || ($master_zone_ip == "")) {
-		log_error("[sxbind] A required XMLRPC sync parameter (username, password, replication target, port, protocol or zone master IP) is empty ... aborting pkg sync");
+		log_error("[sxbind] ERROR: A required XMLRPC sync parameter (username, password, replication target, port, protocol or zone master IP) is empty ... aborting pkg sync");
 		return;
 	}
 
@@ -1383,7 +1731,7 @@ function sxbind_do_xmlrpc_sync($sync_to_ip, $port, $protocol, $username, $passwo
 		);
 
 		/* Set a few variables needed for sync */
-		log_error("[sxbind] Beginning bind XMLRPC sync to {$url}:{$port}.");
+		log_error("[sxbind] INFO: Beginning bind XMLRPC sync to {$url}:{$port}.");
 		$method = 'pfsense.merge_installedpackages_section_xmlrpc';
 		$msg = new XML_RPC_Message($method, $params);
 		$cli = new XML_RPC_Client('/xmlrpc.php', $url, $port);
@@ -1404,7 +1752,7 @@ function sxbind_do_xmlrpc_sync($sync_to_ip, $port, $protocol, $username, $passwo
 			log_error($error);
 			file_notice("sync_settings", $error, "sxbind Settings Sync", "");
 		} else {
-			log_error("[sxbind] XMLRPC sync successfully completed with {$url}:{$port}.");
+			log_error("[sxbind] INFO: XMLRPC sync successfully completed with {$url}:{$port}.");
 		}
 
 		/* Tell bind to reload our settings on the destination sync host. */
@@ -1415,7 +1763,7 @@ function sxbind_do_xmlrpc_sync($sync_to_ip, $port, $protocol, $username, $passwo
 			XML_RPC_encode($execcmd)
 		);
 
-		log_error("[sxbind] XMLRPC reload data {$url}:{$port}.");
+		log_error("[sxbind] INFO: XMLRPC reload data {$url}:{$port}.");
 		$msg = new XML_RPC_Message($method, $params);
 		$cli = new XML_RPC_Client('/xmlrpc.php', $url, $port);
 		$cli->setCredentials($username, $password);
@@ -1427,7 +1775,7 @@ function sxbind_do_xmlrpc_sync($sync_to_ip, $port, $protocol, $username, $passwo
 		} elseif ($resp->faultCode()) {
 			$cli->setDebug(1);
 			$resp = $cli->send($msg, $synctimeout);
-			$error = "[sxbind] An error code was received while attempting sxbind XMLRPC sync with {$url}:{$port} - Code " . $resp->faultCode() . ": " . $resp->faultString();
+			$error = "[sxbind] ERROR: An error code was received while attempting sxbind XMLRPC sync with {$url}:{$port} - Code " . $resp->faultCode() . ": " . $resp->faultString();
 			log_error($error);
 			file_notice("sync_settings", $error, "sxbind Settings Sync", "");
 		} else {
@@ -1435,7 +1783,6 @@ function sxbind_do_xmlrpc_sync($sync_to_ip, $port, $protocol, $username, $passwo
 		}
 	}
 }
-
 function reverse_zonename($zonename, $zonereverso = false, $zonereversv6o = false)
 {
 	if ($zonereverso == "on") {

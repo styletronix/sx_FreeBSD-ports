@@ -201,7 +201,7 @@ namespace sxbind {
             // validate and save to DB if successfull.
             // Defaut format text for master zones.
             // TODO: detect the zone format. text|raw|raw=|map
-            exec(self::$PATH_CHECKZONE . ' -F text ' .
+            exec(self::$PATH_CHECKZONE . ' -i none -k ignore -m ignore -M ignore -n ignore -S ignore -F text ' .
                 '-o ' . escapeshellarg(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$view}/{$rzone}.DB") . ' ' .
                 escapeshellarg($zonename) . ' ' .
                 escapeshellarg($tempDB) . ' 2>&1', $output, $resultCode);

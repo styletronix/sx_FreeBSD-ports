@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE packagegui SYSTEM "../schema/packages.dtd">
 <?xml-stylesheet type="text/xsl" href="../xsl/package.xsl"?>
 <packagegui>
@@ -52,10 +52,6 @@
 		<tab>
 			<text>Tools</text>
 			<url>/sxbind_tools.php</url>
-		</tab>
-		<tab>
-			<text>Show all Zone Records</text>
-			<url>/sxbind_dump.php</url>
 		</tab>
 		<tab>
 			<text>Edit Zone DB</text>
@@ -159,7 +155,6 @@
 				]]>
 			</description>
 			<type>input</type>
-			<required />
 		</field>
 		<field>
 			<fielddescr>Zone Name</fielddescr>
@@ -194,7 +189,7 @@
 			<source><![CDATA[$config['installedpackages']['sxbindviews']['config']]]></source>
 			<source_name>name</source_name>
 			<source_value>name</source_value>
-			<multiple/>
+			<multiple />
 			<size>02</size>
 		</field>
 		<field>
@@ -222,7 +217,7 @@
 			<fieldname>dnssec</fieldname>
 			<enablefields>backupkeys</enablefields>
 			<description>Enable inline DNSSEC signing</description>
-                        <sethelp>
+			<sethelp>
                                 <![CDATA[
                                 See <a href="https://kb.isc.org/article/AA-00626/109/Inline-Signing-in-ISC-BIND-9.9.0-Examples.html">Inline DNSSEC signing</a>.
                                 ]]>
@@ -280,13 +275,21 @@
 		<field>
 			<fielddescr>TTL</fielddescr>
 			<fieldname>tll</fieldname>
-			<description>Default expiration time of all resource records without their own TTL value.</description>
+			<description>Default expiration time of all resource records without their own TTL
+				value.</description>
 			<type>input</type>
 		</field>
 		<field>
 			<fielddescr>Name Server</fielddescr>
 			<fieldname>nameserver</fieldname>
-			<description>Enter nameserver for this zone.</description>
+			<description>Enter nameserver FQDN for this zone. (server.mydomain.com)</description>
+			<type>input</type>
+			<required/>
+		</field>
+		<field>
+			<fielddescr>Name Server IP</fielddescr>
+			<fieldname>nameserverip</fieldname>
+			<description>Enter nameserver IP address. (IPv4 and IPv6 accepted)</description>
 			<type>input</type>
 		</field>
 		<field>
@@ -308,7 +311,8 @@
 		<field>
 			<fielddescr>Serial</fielddescr>
 			<fieldname>serial</fieldname>
-			<description>Parsed value for the slave to update the DNS zone.</description>
+			<description>Current Zone Serial. Will automatically filled if empty.</description>
+			<default_value>1</default_value>
 			<type>input</type>
 		</field>
 		<field>
@@ -353,17 +357,17 @@
 			<source><![CDATA[$config['installedpackages']['sxbindacls']['config']]]></source>
 			<source_name>name</source_name>
 			<source_value>name</source_value>
-			<multiple/>
+			<multiple />
 			<size>03</size>
 		</field>
 		<field>
 			<fielddescr>Enable update-policy</fielddescr>
 			<fieldname>enable_updatepolicy</fieldname>
 			<description>
-			  Enable update-policy which overrides allow-update.
+				Enable update-policy which overrides allow-update.
 			</description>
 			<sethelp>
-			  The update-policy statement replaces the allow-update statement.
+				The update-policy statement replaces the allow-update statement.
 			</sethelp>
 			<type>checkbox</type>
 			<enablefields>updatepolicy</enablefields>
@@ -393,7 +397,7 @@
 			<source><![CDATA[$config['installedpackages']['sxbindacls']['config']]]></source>
 			<source_name>name</source_name>
 			<source_value>name</source_value>
-			<multiple/>
+			<multiple />
 			<size>03</size>
 		</field>
 		<field>
@@ -415,10 +419,10 @@
 			<source><![CDATA[$config['installedpackages']['sxbindacls']['config']]]></source>
 			<source_name>name</source_name>
 			<source_value>name</source_value>
-			<multiple/>
+			<multiple />
 			<size>03</size>
 		</field>
-		<field>
+		<!-- <field>
 			<type>listtopic</type>
 			<name>Zone Domain records</name>
 			<fieldname>temp02</fieldname>
@@ -473,54 +477,33 @@
 				<rowhelperfield>
 					<fielddescr>Alias or IP address</fielddescr>
 					<fieldname>hostdst</fieldname>
-					<description>Enter the IP address or FQDN destination for domain's MX (Example: 10.31.11.1 or mail.example.com)</description>
+					<description>Enter the IP address or FQDN destination for domain's MX (Example: 10.31.11.1 or
+		mail.example.com)</description>
 					<type>input</type>
 					<size>35</size>
 				</rowhelperfield>
 				<movable>on</movable>
 			</rowhelper>
-		</field>
-		<field>
+		</field> -->
+		<!-- <field>
 			<fieldname>regdhcpstatic</fieldname>
 			<fielddescr>Register DHCP Static Mappings</fielddescr>
-			<description>If this option is set, then DHCP static mappings will be registered in DNS, so that their name can be resolved.</description>
+			<description>If this option is set, then DHCP static mappings will be registered in DNS, so that
+		their name can be resolved.</description>
 			<type>checkbox</type>
-		</field>
+		</field> -->
 		<field>
 			<type>listtopic</type>
-			<name>Custom Zone Domain Records</name>
+			<name>Zone Records</name>
 			<fieldname>temp02</fieldname>
 		</field>
 		<field>
-			<fielddescr></fielddescr>
-			<fieldname>customzonerecords</fieldname>
+			<fielddescr>Info</fielddescr>
+			<fieldname>just_info</fieldname>
+			<type>info</type>
 			<description>
-				<![CDATA[
-				Paste any custom zone records to include in this zone.<br />
-				This can be used for a fast migration setup.
-				]]>
-			</description>
-			<type>textarea</type>
-			<cols>84</cols>
-			<rows>10</rows>
-			<encoding>base64</encoding>
-			<dontdisplayname/>
-			<usecolspan2/>
-		</field>
-		<field>
-			<type>listtopic</type>
-			<name>Resulting Zone Config File</name>
-		</field>
-		<field>
-			<fielddescr></fielddescr>
-			<fieldname>resultconfig</fieldname>
-			<description>Resulting sxbind config file for this zone.</description>
-			<type>textarea</type>
-			<cols>84</cols>
-			<rows>15</rows>
-			<encoding>base64</encoding>
-			<dontdisplayname/>
-			<usecolspan2/>
+				All Zone Records are Managed within the Zone Editor, which can be invoked after
+				initial Zone Creation.</description>
 		</field>
 		<field>
 			<name>DEBUG</name>
@@ -530,7 +513,8 @@
 			<fielddescr>Reset Zone</fielddescr>
 			<fieldname>reset_zone</fieldname>
 			<description>
-				ATTENTION: This option will delete the DB for the current zone durimng the next update. Uso only if DB contains unresolvable errors.
+				ATTENTION: This option will delete the DB for the current zone durimng the next
+				update. Uso only if DB contains unresolvable errors.
 			</description>
 			<type>checkbox</type>
 		</field>
@@ -539,12 +523,7 @@
 		sxbind_print_javascript_type_zone();
 	</custom_php_after_head_command>
 	<custom_php_validation_command>
-		<![CDATA[
-		if ($_POST['type'] == "master" and $_POST['serial'] == "") {
-			$_POST['serial'] = (date("U") + 1000000000);
-		}
-		sxbind_zone_validate($_POST, $input_errors);
-		]]>
+			sxbind_zone_validate($_POST, $input_errors);
 	</custom_php_validation_command>
 	<custom_delete_php_command>
 		sxbind_sync();

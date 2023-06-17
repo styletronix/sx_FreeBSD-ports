@@ -7,7 +7,7 @@ use sxbind\ZoneParser;
 require_once("guiconfig.inc");
 require_once("config.inc");
 require_once("/usr/local/pkg/sxbind_zoneparser.inc");
-require_once("sxbind.inc");
+require_once("/usr/local/pkg/sxbind.inc");
 
 /**
  * Converts all special characters to html entities and adds <wbr>-tag as suffix to any point (.) to enable better line break in long host names.
