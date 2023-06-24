@@ -38,5 +38,5 @@ $priv_list['page-services-sxbinddns']['match'][] = "pkg_edit.php?xml=sxbind_view
 $priv_list['page-services-sxbinddns']['match'][] = "pkg_edit.php?xml=sxbind_zones.xml*";
 
 $priv_list['page-services-sxbinddns']['match'][] = "widgets/widgets/sxbind.widget.php*";
-
+$priv_list['page-services-sxbinddns']['match'][] = "sxbind_*";
 ?>

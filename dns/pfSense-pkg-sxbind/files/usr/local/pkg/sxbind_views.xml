@@ -51,16 +51,12 @@
 			
 		</tab>
 		<tab>
-			<text>Tools</text>
-			<url>/sxbind_tools.php</url>
-		</tab>
-		<tab>
-			<text>Show all Zone Records</text>
-			<url>/sxbind_dump.php</url>
+			<text>TSIG-Keys</text>
+			<url>/sxbind_keys.php</url>
 		</tab>
 		<tab>
 			<text>Edit Zone DB</text>
-			<url>/sxbind_zoneEdit.php</url>
+			<url>/sxbind_zone_edit.php</url>
 		</tab>
 		<tab>
 			<text>Sync</text>

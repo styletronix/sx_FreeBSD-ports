@@ -102,6 +102,24 @@ if ($_POST) {
         }
     }
 
+    if ($post["action"] == 'delete_rrecord') {
+        print('not implemented');
+        http_response_code(501);
+        exit;
+    }
+
+    if ($post["action"] == 'update_rrecord') {
+        print('not implemented');
+        http_response_code(501);
+        exit;
+    }
+    
+    if ($post["action"] == 'add_rrecord') {
+        print('not implemented');
+        http_response_code(501);
+        exit;
+    }
+    
     if ($post["action"] == 'thaw' || $thaw == true) {
         if ($zoneview) {
             $ret = ZoneParser::thaw_zone($zoneview, $zonename_reverse);
@@ -188,7 +206,7 @@ if ($input_errors) {
 
 if (!empty($savemsg)) {
     $msgnew = '';
-    foreach($savemsg as $msg){
+    foreach ($savemsg as $msg) {
         $msgnew .= htmlspecialchars($msg) . '<br/>';
     }
     print_info_box($msgnew, 'success');
@@ -212,11 +230,10 @@ if (!empty($savemsg)) {
                 </label>
                 <div class="col-sm-10">
                     <select class="form-control" name="zoneselect" id="zoneselect" onchange="this.form.submit()">
-                    <option value="">[Select a Zone]</option> 
-                    <optgroup label="-- ALL Zones (not editable) --">
-                            <option <? if ($zonename == "all") {
-                                print('selected="selected"');
-                            } ?> value="all">Show ALL Zones in a single List</option>
+                        <option value="">[Select a Zone]</option>
+                        <optgroup label="-- ALL Zones (not editable) --">
+                            <option <?= $zonename == "all" ? 'selected="selected"' : ''; ?> value="all">Show ALL Zones in a
+                                single List</option>
                         </optgroup>
                         <optgroup label="-- Master Zones --">
                             <? foreach ($zonelist as $key => $value) { ?>
@@ -309,7 +326,7 @@ if (!empty($savemsg)) {
                 ?>
                 <div class="panel panel-default">
                     <div class="form-group">
-                        <div class="col-sm-12 ">
+                        <div class="col-sm-12">
                             <input id="showAdvanced" type="checkbox">Show Advanced Values.</input>
                         </div>
                     </div>
@@ -320,88 +337,129 @@ if (!empty($savemsg)) {
                                 data-sortable>
                                 <thead>
                                     <tr>
-                                        <th>
+                                        <th style="width:200px;">
                                             <?= gettext("Name") ?>
                                         </th>
-                                        <th>
+                                        <th style="width:100px;">
                                             <?= gettext("Type") ?>
                                         </th>
-                                        <th>
+                                        <th style="min-width:500px;">
                                             <?= gettext("Values") ?>
                                         </th>
-                                        <th>
-                                            <?= gettext("in config") ?>
-                                        </th>
-                                        <th>
+                                        <th style="width:150px;">
                                             <?= gettext("Action") ?>
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr data-template-row="edit" style="display: none;">
-                                        <td data-fieldname="name"></td>
+                                    <tr data-template-row="newRow">
+                                        <td>
+                                            <input data-fieldname="name" />
+                                        </td>
                                         <td>
                                             <select data-fieldname="type">
-                                                <option value="A">A</option>
-                                                <option value="AAAA">AAAA</option>
-                                                <option value="TXT">TXT</option>
-                                                <option value="SPF">SPF</option>
-                                                <option value="MX">MX</option>
-                                                <option value="NS">NS</option>
-                                                <option value="SOA">SOA</option>
-                                                <option value="CNAME">CNAME</option>
-                                                <option value="PTR">PTR</option>
-                                                <option value="SRV">SRV</option>
-                                                <option value="DCHID">DCHID</option>
-                                                <option value="CERT">CERT</option>
-                                                <option value="DNSKEY">DNSKEY</option>
-                                                <option value="RRSIG">RRSIG</option>
-                                                <option value="CDNSKEY">CDNSKEY</option>
-                                                <option value="NSEC">NSEC</option>
-                                                <option value="TA">TA</option>
-                                                <option value="IPSECKEY">IPSECKEY</option>
-                                                <option value="KEY">KEY</option>
-                                                <option value="DNAME">DNAME</option>
-                                                <option value="AFSDB">AFSDB</option>
-                                                <option value="APL">APL</option>
-                                                <option value="CAA">CAA</option>
-                                                <option value="CDS">CDS</option>
-                                                <option value="CSYNC">CSYNC</option>
-                                                <option value="DLV">DLV</option>
-                                                <option value="DS">DS</option>
-                                                <option value="EUI48">EUI48</option>
-                                                <option value="EUI64">EUI64</option>
-                                                <option value="HINFO">HINFO</option>
-                                                <option value="HIP">HIP</option>
-                                                <option value="HTTPS">HTTPS</option>
-                                                <option value="KX">KX</option>
-                                                <option value="NAPTR">NAPTR</option>
-                                                <option value="LOC">LOC</option>
-                                                <option value="OPENPGPKEY">OPENPGPKEY</option>
-                                                <option value="NSEC3">NSEC3</option>
-                                                <option value="NSEC3PARAM">NSEC3PARAM</option>
-                                                <option value="RP">RP</option>
-                                                <option value="SIG">SIG</option>
-                                                <option value="SMIMEA">SMIMEA</option>
-                                                <option value="SSHFP">SSHFP</option>
-                                                <option value="SVCB">SVCB</option>
-                                                <option value="TKEY">TKEY</option>
-                                                <option value="TSIG">TSIG</option>
-                                                <option value="TLSA">TLSA</option>
-                                                <option value="ZONEMD">ZONEMD</option>
-                                                <option value="URI">URI</option>
-                                                <option value="AXFR">AXFR</option>
-                                                <option IXFR="TLSA">IXFR</option>
+                                                <option value="">[Select a Type]</option>
+                                                <? foreach (ZoneParser::RECORDTYPES as $type) {
+                                                    print('<option value="' . $type . '">' . $type . '</option>');
+                                                } ?>
                                             </select>
                                         </td>
                                         <td>
-                                            <input data-fieldname="priority" type="number" />
-                                            <input data-fieldname="hostname" type="mailserver" />
-                                            <input data-fieldname="ip" type="text" />
-                                            <input data-fieldname="rdata" type="text" />
+                                            <table style="width:100%;">
+                                                <tr data-fieldset="ttl" style="display:none;">
+                                                    <td>
+                                                        <label for="ttl">TTL</label>
+                                                    </td>
+                                                    <td>
+                                                        <input data-fieldname="ttl" id="ttl" type="number" />
+                                                    </td>
+                                                </tr>
+                                                <tr data-fieldset="priority" style="display:none;">
+                                                    <td>
+                                                        <label for="priority">Priority</label>
+                                                    </td>
+                                                    <td>
+                                                        <input data-fieldname="priority" id="priority" type="number" />
+                                                    </td>
+                                                </tr>
+                                                <tr data-fieldset="weight" style="display:none;">
+                                                    <td><label for="weight">Weight</label></td>
+                                                    <td><input data-fieldname="weight" id="weight" type="number"
+                                                            style="width:100%;" /></td>
+                                                </tr>
+                                                <tr data-fieldset="nameserver" style="display:none;">
+                                                    <td><label for="nameserver">Nameserver</label></td>
+                                                    <td><input data-fieldname="nameserver" id="nameserver" type="text"
+                                                            style="width:100%;" /></td>
+                                                </tr>
+                                                <tr data-fieldset="mname" style="display:none;">
+                                                    <td><label for="mname">MName</label></td>
+                                                    <td><input data-fieldname="mname" id="mname" type="text" /></td>
+                                                </tr>
+                                                <tr data-fieldset="rname" style="display:none;">
+                                                    <td><label for="rname">RName</label></td>
+                                                    <td><input data-fieldname="rname" id="rname" type="text" /></td>
+                                                </tr>
+                                                <tr data-fieldset="txt" style="display:none;">
+                                                    <td><label for="txt">Text</label></td>
+                                                    <td><textarea data-fieldname="txt" rows="3" class="form-control"
+                                                            style="width: auto;" id="txt"></textarea></td>
+                                                </tr>
+                                                <tr data-fieldset="port" style="display:none;">
+                                                    <td><label for="port">Port</label></td>
+                                                    <td><input data-fieldname="port" id="port" type="number" /></td>
+                                                </tr>
+                                                <tr data-fieldset="serial" style="display:none;">
+                                                    <td><label for="serial">serial</label></td>
+                                                    <td><input data-fieldname="serial" id="serial" type="number" /></td>
+                                                </tr>
+                                                <tr data-fieldset="retry" style="display:none;">
+                                                    <td><label for="retry">retry</label></td>
+                                                    <td><input data-fieldname="retry" id="retry" type="number" /></td>
+                                                </tr>
+                                                <tr data-fieldset="expire" style="display:none;">
+                                                    <td><label for="expire">expire</label></td>
+                                                    <td><input data-fieldname="expire" id="expire" type="number" /></td>
+                                                </tr>
+                                                <tr data-fieldset="minimum" style="display:none;">
+                                                    <td><label for="minimum">minimum</label></td>
+                                                    <td><input data-fieldname="minimum" id="minimum" type="number" /></td>
+                                                </tr>
+                                                <tr data-fieldset="refresh" style="display:none;">
+                                                    <td><label for="refresh">refresh</label></td>
+                                                    <td><input data-fieldname="refresh" id="refresh" type="number" /></td>
+                                                </tr>
+                                                <tr data-fieldset="host" style="display:none;">
+                                                    <td><label for="host">host</label></td>
+                                                    <td><input data-fieldname="host" id="host" type="text" /></td>
+                                                </tr>
+                                                <tr data-fieldset="ip" style="display:none;">
+                                                    <td><label for="ip">IP</label></td>
+                                                    <td><input data-fieldname="ip" id="ip" type="text" /></td>
+                                                </tr>
+                                                <tr data-fieldset="rdata" style="display:none;">
+                                                    <td><label for="rdata">RData</label></td>
+                                                    <td><textarea data-fieldname="rdata" id="rdata" rows="4"
+                                                            class="form-control" style="width: auto;"></textarea></td>
+                                                </tr>
+                                                <tr data-fieldset="rdata" style="display:none;">
+                                                    <td class="help-block" colspan="2">
+                                                        This Field contains the raw zone data following the name field. Use
+                                                        only if the selected record type is not directly supported by this
+                                                        tool.
+                                                    </td>
+                                                </tr>
+                                            </table>
                                         </td>
                                         <td>
-                                            <input data-fieldname="_inconfig" type="checkbox" />
+                                            <button class="btn btn-primary" type="button" value="add_record" name="action">
+                                                <i class="fa fa-plus icon-embed-btn"></i>
+                                                <?= gettext('Add') ?>
+                                            </button>
+                                            <button class="btn btn-primary" type="button" value="save_record" name="action">
+                                                <i class="fa fa-save icon-embed-btn"></i>
+                                                <?= gettext('Save') ?>
+                                            </button>
                                         </td>
                                     </tr>
                                     <? foreach ($post['zone_parsed'] as $record) { ?>
@@ -452,23 +510,14 @@ if (!empty($savemsg)) {
                                                 }
                                                 ?>
                                             </td>
-                                            <td>
-                                                <?= $record['_inconfig'] ?>
+                                            <td><button class="btn btn-danger" type="button" value="delete_record" name="action">
+                                                <i class="fa fa-trash icon-embed-btn"></i>
+                                                <?= gettext('Delete') ?></button>
                                             </td>
-                                            <td></td>
                                         </tr>
                                     <? } ?>
                                 </tbody>
                             </table>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <div class="col-sm-12">
-                            <button class="btn btn-primary" type="button" value="add_record" name='action'><i
-                                    class="fa fa-plus icon-embed-btn"> </i>
-                                <?= gettext('Add') ?>
-                            </button>
                         </div>
                     </div>
                 </div>
@@ -510,25 +559,34 @@ if (!empty($savemsg)) {
 include('foot.inc');
 ?>
 <script type="text/javascript">
-// Show active tab on reload
-if (location.hash !== '')
-    $('a[href="' + location.hash + '"]').tab('show');
-
-// Remember the hash in the URL without jumping
-$('a[data-toggle="tab"]').on('shown.bs.tab', function(e) {
-    if(history.pushState) {
-        history.pushState(null, null, '#'+$(e.target).attr('href').substr(1));
+    var recordtypeFieldlist = {
+        <? foreach (ZoneParser::REQUIRED_FIELDS as $key => $value) {
+            print('"' . $key . '": [');
+            foreach ($value as $val) {
+                print('"' . $val . '",');
+            }
+            print('],');
+        } ?>
     }
-    else {
-        location.hash = '#'+$(e.target).attr('href').substr(1);
-    }
-});
 
-// Remember to back button
-window.onpopstate = function(e) {
-    $('a[href="' + location.hash + '"]').tab('show');
-};
+    // Show active tab on reload
+    if (location.hash !== '')
+        $('a[href="' + location.hash + '"]').tab('show');
 
+    // Remember the hash in the URL without jumping
+    $('a[data-toggle="tab"]').on('shown.bs.tab', function (e) {
+        if (history.pushState) {
+            history.pushState(null, null, '#' + $(e.target).attr('href').substr(1));
+        }
+        else {
+            location.hash = '#' + $(e.target).attr('href').substr(1);
+        }
+    });
+
+    // Remember to back button
+    window.onpopstate = function (e) {
+        $('a[href="' + location.hash + '"]').tab('show');
+    };
 
     function showMessage($text) {
         $('#dlg_updatestatus_text').text($text)
@@ -546,10 +604,134 @@ window.onpopstate = function(e) {
     function hideWait() {
         $('#dlg_updatestatus_text').modal('hide')
     }
+    function getDataFromRow($row) {
+        var data = {}
+        $row.find("[data-fieldname]").each(function (index) {
+            if ($(this).is(":visible")) {
+                var name = $(this).attr('data-fieldname')
+                data[name] = $(this).val()
+            }
+        })
+        return data;
+    }
+
+    function add_rrecord(rrecord) {
+        data = {action: "add_rrecord"}
+        
+        Object.entries(rrecord).forEach(entry => {
+            const [key, value] = entry
+            data["rr_" + key] = value
+        })
+
+        return new Promise((resolve, reject) => {
+            $.ajax(
+                {
+                    type: 'post',
+                    data: data,
+                    success: function (data) {
+                        resolve(data)
+                    },
+                    error: function (data) {
+                        showMessage(data.responseText)
+                        reject(data.responseText)
+                    }
+                })
+        })
+    }
+
+    function delete_rrecord(id) {
+        data = {
+            action: "delete_rrecord",
+            rrid: id
+        }
+        return new Promise((resolve, reject) => {
+            $.ajax(
+                {
+                    type: 'post',
+                    data: data,
+                    success: function (data) {
+                        resolve(data)
+                    },
+                    error: function (data) {
+                        showMessage(data.responseText)
+                        reject(data.responseText)
+                    }
+                })
+        })
+    }
+
+    function update_rrecord(rrecord, rrecordOld) {
+        data = {action: "dupdate_rrecord"}
+        
+        Object.entries(rrecord).forEach(entry => {
+            const [key, value] = entry
+            data["rr_" + key] = value
+        })
+
+        Object.entries(rrecordOld).forEach(entry => {
+            const [key, value] = entry
+            data["rro_" + key] = value
+        })
+
+        return new Promise((resolve, reject) => {
+            $.ajax(
+                {
+                    type: 'post',
+                    data: data,
+                    success: function (data) {
+                        resolve(data)
+                    },
+                    error: function (data) {
+                        showMessage(data.responseText)
+                        reject(data.responseText)
+                    }
+                })
+        })
+    }
 
     events.push(function () {
-        $("form").submit(function(){
-            showWait("<?=gettext("Loading Zone Data...")?>");
+        $("button[type=\"submit\"]").on("click", () => {
+            $(this).button('loading')
+        })
+
+        $("button[value=\"add_record\"]").on('click', function () {
+           var $btn = $(this)
+            $btn.button('loading')
+            var data = getDataFromRow($btn.closest("tr"));
+            
+            add_rrecord(data)
+                .then(function(){
+                    alert("Added")
+                })
+                .finally(function(){
+                    $btn.button('reset')
+                })
+        })
+
+        $("button[value=\"save_record\"]").on('click', function () {
+            var $btn = $(this)
+            $btn.button('loading')
+            var data = getDataFromRow($btn.closest("tr"));
+            alert("not implemented jet")
+            //update_rrecord(data,dataOld)
+        })
+        $("button[value=\"delete_record\"]").on('click', function () {
+            var $btn = $(this)
+            $btn.button('loading')
+
+            var id = $btn.closest("[data-id]").attr('data-id');
+            var tr = $btn.closest("tr")
+           delete_rrecord(id)
+            .then(function(){
+                    tr.remove()
+                })
+                .finally(function(){
+                    $btn.button('reset')
+                })
+        })
+
+        $("form").submit(function () {
+            showWait("<?= gettext("Loading Zone Data...") ?>");
         });
 
         $(window).on('beforeunload', function () {
@@ -566,7 +748,7 @@ window.onpopstate = function(e) {
             }
         })
 
-        $("a[data-clipboard]").on("click", async function (event) {
+        $("[data-clipboard]").on("click", async function (event) {
             event.preventDefault();
 
             try {
@@ -575,6 +757,21 @@ window.onpopstate = function(e) {
                 $(this).attr("class", "fa fa-check-circle")
             } catch (err) {
                 $(this).attr("class", "fa fa-times-circle")
+            }
+        })
+
+        $("select[data-fieldname='type']").on("change", function () {
+            var $tablerow = $(this).closest("tr")
+            $tablerow.find("[data-fieldset]").hide();
+            var type = $(this).val();
+
+            var fieldlist = recordtypeFieldlist[type];
+            if (fieldlist == undefined) {
+                $tablerow.find("[data-fieldset=\"rdata\"]").show()
+            } else {
+                fieldlist.forEach(element => {
+                    $tablerow.find("[data-fieldset=\"" + element + "\"]").show()
+                })
             }
         })
     })

@@ -36,6 +36,18 @@ namespace sxbind {
         const CHROOT_LOCALBASE = '/var/etc/named';
         const CONFIGPREFIX = 'sx';
         const RECORDTYPES_EXPANDABLE = ['A', 'AAAA', 'CNAME', 'TXT', 'SPF', 'PTR', 'MX', 'SOA', 'SRV', 'NS'];
+        const REQUIRED_FIELDS = [
+            'A' => ['name', 'ttl', 'ip'],
+            'AAAA' => ['name', 'ttl', 'ip'],
+            'CNAME' => ['name', 'ttl', 'host'],
+            'TXT' => ['name', 'ttl', 'txt'],
+            'SPF' => ['name', 'ttl', 'txt'],
+            'PTR' => ['name', 'ttl', 'host'],
+            'MX' => ['name', 'ttl', 'priority', 'host'],
+            'SOA' => ['name', 'ttl', 'mname', 'rname', 'serial', 'refresh', 'retry', 'expire', 'minimum'],
+            'SRV' => ['name', 'ttl', 'priority', 'weight', 'port', 'host'],
+            'NS' => ['name', 'ttl', 'nameserver']
+        ];
         const RECORDTYPES = [
             'A',
             'AAAA',
@@ -183,7 +195,7 @@ namespace sxbind {
                 $dataMerged = array_merge($dataMerged, $data2);
 
                 $data = implode("\n", $dataMerged);
-                
+
                 log_error('[bind] Serial has been incremented to ' . $soa_record['serial']);
             } else {
                 log_error('[bind] Serial in zone data not found!');
@@ -239,14 +251,28 @@ namespace sxbind {
             return self::parse_rndc_zone_dump(self::get_rndc_zone_dump());
         }
 
+        /**
+         * Create a new TSIG Key by using tsig-keygen
+         * @param string $name The name for the Key
+         * @throws \Exception
+         * @return string   Returns the key as string as used in named.conf or rndc.conf
+         */
         public static function create_tsig_key($name)
         {
+            if (!$name) {
+                throw new \Exception("Name is required for Key generation.", 1);
+            }
+
             exec('tsig-keygen ' . escapeshellcmd($name) . ' 2>&1', $output, $retval);
+            if ($retval != 0) {
+                throw new \Exception('Exception during key generation: ' . implode("\n", $output), $retval);
+            }
             return implode("\n", $output);
         }
 
         /**
          * Returns the complete Zone Dump including all Zones, served by BIND. This includes all master, slave and automatically created Zones.
+         * @throws \Exception Throws an exception if failed.
          * @return string|bool Returns the complete Zone Dump as string or false if failed.
          */
         public static function get_rndc_zone_dump()
@@ -280,7 +306,21 @@ namespace sxbind {
             }
             return false;
         }
-
+        /**
+         * Converts the Bind DNS Zone to a human readable and parseable string.
+         * Throws an exception if zone could not be converted.
+         * @param mixed $zoneconfig The sxbindzone config for the zone to compile
+         * @throws \Exception Throws an exception if failed.
+         * @return string
+         */
+        public static function get_zone_as_string($zoneconfig){
+            $zonename = self::get_zone_fullname($zoneconfig);
+            return self::compilezone($zoneconfig['view'], $zonename, $zoneconfig['type']);
+        }
+        public static function get_zone_as_string_2($view, $zone, $type = 'master'){
+            $zonename = '';
+            return self::compilezone($view, $zonename, $type);
+        }
         /**
          * Compiles the Bind DNS Zone to a human readable and parseable string.
          * @param string $view View of the Zone
@@ -576,7 +616,7 @@ namespace sxbind {
 
         public static function record_exists_by_name($entries, $name, $types = ['A', 'AAAA', 'PTR'])
         {
-            foreach ($entries as $entry) {
+            foreach ($entries as $entry) { 
                 if (trim($entry['name'], '.') == trim($name, '.') && in_array($entry['type'], $types)) {
                     return true;
                 }
@@ -661,9 +701,9 @@ namespace sxbind {
                 "[\s,]*'([^']+)'[\s,]*|" .
                 "[\s,]+/", $record['rdata'], 0, PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE);
 
+            $record['_required'] = self::REQUIRED_FIELDS[$record['type']];
             switch ($record['type']) {
                 case 'MX':
-                    $record['_required'] = ['name', 'ttl', 'priority', 'host'];
                     if (count($val) == 2) {
                         $record['priority'] = $val[0];
                         $record['host'] = $val[1];
@@ -676,7 +716,6 @@ namespace sxbind {
                     break;
 
                 case 'SRV':
-                    $record['_required'] = ['name', 'ttl', 'priority', 'weight', 'port', 'host'];
                     if (count($val) == 4) {
                         $record['priority'] = $val[0];
                         $record['weight'] = $val[1];
@@ -693,7 +732,6 @@ namespace sxbind {
                     break;
 
                 case 'NS':
-                    $record['_required'] = ['name', 'ttl', 'nameserver'];
                     if (count($val) == 1) {
                         $record['nameserver'] = $val[0];
                         $record['_expanded'] = true;
@@ -704,7 +742,6 @@ namespace sxbind {
                     break;
 
                 case 'PTR':
-                    $record['_required'] = ['name', 'ttl', 'host'];
                     if (count($val) == 1) {
                         $record['ip'] = self::ptr_to_ip($record['name']);
                         $record['host'] = $val[0];
@@ -717,7 +754,6 @@ namespace sxbind {
 
                 case 'A':
                 case 'AAAA':
-                    $record['_required'] = ['name', 'ttl', 'ip'];
                     if (count($val) == 1) {
                         $record['ip'] = $val[0];
                         $record['ptr'] = self::ip_to_ptr($record['ip']);
@@ -730,13 +766,11 @@ namespace sxbind {
 
                 case 'TXT':
                 case 'SPF':
-                    $record['_required'] = ['name', 'ttl', 'txt'];
                     $record['txt'] = self::unescape_dns_string(implode('', self::mb_explode_escaped('"', $record['rdata'])));
                     $record['_expanded'] = true;
                     break;
 
                 case 'CNAME':
-                    $record['_required'] = ['name', 'ttl', 'host'];
                     if (count($val) == 1) {
                         $record['host'] = $val[0];
                         $record['_expanded'] = true;
@@ -747,7 +781,6 @@ namespace sxbind {
                     break;
 
                 case 'SOA':
-                    $record['_required'] = ['name', 'ttl', 'mname', 'rname', 'serial', 'refresh', 'retry', 'expire', 'minimum'];
                     if (count($val) == 7) {
                         $record['mname'] = $val[0];
                         $record['rname'] = $val[1];
@@ -1037,24 +1070,17 @@ namespace sxbind {
         }
 
         /**
-         * Reads the ZoneList from the bindzone config in pfSense config file.
-         * Sorted alphabetically 
+         * Reads the Zones from the config and returns a sorted list.
          */
         public static function get_zonelist()
         {
-            global $config;
-
-            if (is_array($config['installedpackages'][self::CONFIGPREFIX . 'bindzone'])) {
-                $bindzone = $config['installedpackages'][self::CONFIGPREFIX . 'bindzone']['config'];
-                $col = array_column($bindzone, 'name');
-                array_multisort($col, SORT_ASC, $bindzone);
-            } else {
-                $bindzone = array();
-            }
+            $bindzone = config_get_path('installedpackages/sxbindzone/config',[]);
+            $col = array_column($bindzone, 'name');
+            array_multisort($col, SORT_ASC, $bindzone);    
             return $bindzone;
         }
         /**
-         * Reads all static zone records from config.xml for all Zones.
+         * Reads all static zone records from config for all Zones.
          * @param boolean $include_customzonerecords If true, custom zone records will also be included in the result. 
          * '_iscustomrecord' will be set to true for all records found in custom zone file. Otherwise '_iscustomrecord' is false or undefined.
          * @return array Returns array of zone records as it would be returned from parse_rndc_zone_dump().
@@ -1152,28 +1178,29 @@ namespace sxbind {
         }
 
         /** 
-         * Returns the simple zone name by removing .ip6.arpa or .in-addr.arpa (may include . at the end or not) from the string.
+         * Returns the simple zone name by removing .ip6.arpa(.) or .in-addr.arpa(.) or $name if nothing is removed.
          */
         public static function re_reverse_zonename($name)
         {
-            if (str_ends_with($name, '.ip6.arpa')) {
+            if (str_ends_with(strtolower($name), '.ip6.arpa')) {
                 return substr($name, 0, -9);
             }
-            if (str_ends_with($name, '.in-addr.arpa')) {
+            if (str_ends_with(strtolower($name), '.in-addr.arpa')) {
                 return substr($name, 0, -13);
             }
-            if (str_ends_with($name, '.ip6.arpa.')) {
+            if (str_ends_with(strtolower($name), '.ip6.arpa.')) {
                 return substr($name, 0, -10);
             }
-            if (str_ends_with($name, '.in-addr.arpa.')) {
+            if (str_ends_with(strtolower($name), '.in-addr.arpa.')) {
                 return substr($name, 0, -14);
             }
             return $name;
         }
 
         /** 
+         * DEPRECATED: Use get_zone_fullname() instead
          * Returns the zone name including ipv6.arpa or in-addr.arpa if required. Otherwise it returns the plain zone name.
-         * Be carefull as this does NOT include trailing point (.)
+         * Be carefull as this does NOT include point at the end (.)
          * 
          * @param mixed $zone A single zone from get_zonelist()
          * @return string Returns the full zone name.
@@ -1190,6 +1217,17 @@ namespace sxbind {
                 return $zone['name'];
             }
         }
+
+        /** 
+         * Returns the zone name including ipv6.arpa or in-addr.arpa if required. Otherwise it returns the plain zone name
+         * Be carefull as this does NOT include point at the end (.)
+         * 
+         * @param mixed $zone A single zone from get_zonelist()
+         * @return string Returns the full zone name.
+         */
+        public static function get_zone_fullname($zone){
+            return reverse_zonename($zone['name'],$zone['reverso'],$zone['reversv6o']);
+        }
     }
 
 
@@ -1203,6 +1241,109 @@ namespace sxbind {
         ZoneParser::$PATH_COMPILEZONE = '/usr/local/sbin/named-compilezone';
     } else {
         ZoneParser::$PATH_COMPILEZONE = '/usr/local/bin/named-compilezone';
+    }
+
+    class named_config
+    {
+        private $config;
+        const REGEX_BLOCK = '/(?:(?\'name\'.*?){(?\'content\'(?:[^}{]+|(?R))*+)}\s*;)/m';
+        const REGEX_KeyValue = '/(?:(?\'single\'|(?:[^;{}\s]+?))\s*?;)|(?:(?\'key\'[^;{}\s]+?)\s+?(?\'val\'[^;{}]+?)\s*?;)/m';
+        const REGEX_COMMENT = '/\/\*[\s\S]*?\*\/|#.*|\/\/.*/';
+        const REGEX_WORDS = '/((?![";{}])[^\s;{}]+)|("[\s\S]+?")|([;}{])/s';
+
+        function __construct()
+        {
+
+        }
+
+        private function processSubBlock($wordlist)
+        {
+            $data = [];
+            $isfirstword = true;
+            for ($idx = 0; $idx < count($wordlist) ;$idx++)
+                $word = $wordlist[$idx];
+
+                switch ($word) {
+                    case ";":
+                        break;
+
+                    case "{":
+                        $blockstart = $idx + 1;
+                        $blockend = $blockstart;
+                        $subdepth = 1;
+                        // find outer block end.
+                        for ($idx2 = $blockstart; $idx2 < count($wordlist); $idx2++){
+                            if ($wordlist[$idx2] == "{"){
+                                $subdepth ++;
+                            }elseif ($wordlist[$idx2] == "}"){
+                                $subdepth --;
+                                if ($subdepth == 0){
+                                    $blockend = $idx2 - 1;
+                                    break;
+                                }
+                            }
+                        }
+                        if ($subdepth == 0 && $blockend > $blockstart){
+                            $inner_block = array_slice($wordlist, $blockstart, $blockend - $blockstart);
+                          $data['child'] = self::processSubBlock($inner_block);
+                          $idx = $blockend +1;
+                        }else{
+                            // Oh Oh, that should not happen! Maybe } missing.
+                        }
+                        break;
+
+                    case "}":
+                        // should never appear here or there has something gone wrong. Maybe { missing.}
+                        break;
+
+                    default:
+                        if ($isfirstword) {
+                            $data['name'] = $word;
+                            $data['value'] = [];
+                            $isfirstword = false;
+                        } else {
+                            $data['value'][] = $word;
+                        }
+                }
+
+            return $data;
+        }
+
+        public function from_string($txt)
+        {
+            // remove comments
+            $txt = preg_replace(self::REGEX_COMMENT, '', $txt);
+
+            // Split into words
+            preg_match(self::REGEX_WORDS, $txt, $matches);
+            $wordlist = [];
+            foreach ($matches as $word){
+                $wordlist[] = $word[0];
+            }
+
+            self::$config = self::processSubBlock($wordlist);
+        }
+
+        private function to_string_recursive($data){
+            $str = '';
+
+            $str .= $data['name'] . ' ';
+            foreach($data['value'] as $val){
+                $str .= $val . ' ';
+            }
+            $str .= ';\n';
+
+            foreach ($data['child'] as $child){
+                $str .= '{' . self::to_string_recursive($child) . " };\n";
+            }
+           
+            return $str;
+        }
+
+        public function to_string(){
+          $str =  self::to_string_recursive(self::$config);
+            return $str;
+        }
     }
 }
 ?>

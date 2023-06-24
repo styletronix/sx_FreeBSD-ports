@@ -1,0 +1,33 @@
+# Bind pfsense configuration
+# All custom modifications are removed on config change.
+
+[rndc_key]
+
+controls {
+	inet 127.0.0.1 port [controlport]
+		allow { 127.0.0.1; ::1; } keys { "rndc-key"; };
+};
+
+[custom_global_settings]
+
+options {
+	directory "/etc/namedb";
+	pid-file "/var/run/named/pid";
+	statistics-file "/var/log/named.stats";
+	max-cache-size [ram_limit];
+	dnssec-validation [dnssec_validation];
+	listen-on-v6 port [listenport] { [listenonv6] };
+	listen-on port [listenport] { [listenon] };
+	forwarders { [forwarder_ips] };
+	notify [notify];
+	[custom_options]
+};
+
+rate-limit {
+	responses-per-second [rate_limit];
+	log-only [log_only];
+};
+
+[hide_version]
+
+[logging]

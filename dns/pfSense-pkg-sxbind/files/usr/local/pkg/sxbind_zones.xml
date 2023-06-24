@@ -50,12 +50,12 @@
 			<active />
 		</tab>
 		<tab>
-			<text>Tools</text>
-			<url>/sxbind_tools.php</url>
+			<text>TSIG-Keys</text>
+			<url>/sxbind_keys.php</url>
 		</tab>
 		<tab>
 			<text>Edit Zone DB</text>
-			<url>/sxbind_zoneEdit.php</url>
+			<url>/sxbind_zone_edit.php</url>
 		</tab>
 		<tab>
 			<text>Sync</text>
@@ -147,7 +147,7 @@
 		</field>
 		<field>
 			<fielddescr>IP for Reverse Zone</fielddescr>
-			<fieldname>tempconverttoreverse</fieldname>
+			<fieldname>converttoreverse</fieldname>
 			<description>
 				<![CDATA[
 				Enter the IP Address for this zone in regular CIDR notation and it will automatically converted to reverse syntax.<br />
@@ -171,7 +171,7 @@
 		</field>
 		<field>
 			<fielddescr>Zone FQDN</fielddescr>
-			<fieldname>tempfullzonename</fieldname>
+			<fieldname>fullzonename</fieldname>
 			<type>input</type>
 		</field>
 		<field>
@@ -422,76 +422,6 @@
 			<multiple />
 			<size>03</size>
 		</field>
-		<!-- <field>
-			<type>listtopic</type>
-			<name>Zone Domain records</name>
-			<fieldname>temp02</fieldname>
-		</field>
-		<field>
-			<fielddescr>Enter Domain Records</fielddescr>
-			<description>
-				<![CDATA[
-				<strong>"Record"</strong> is the name or last octet of an IP. (Example: www, pop, smtp)<br />
-				<strong>"Type"</strong> is the type of the record. (Example: A, CNAME, MX, NS)<br />
-				<strong>"Priority"</strong> is used only in MX records to define their priority.<br />
-				<strong>"Alias or IP address"</strong> is the destination host or IP address.<br /><br />
-				Note: You can order the elements on this list with drag and drop.
-				]]>
-			</description>
-			<fieldname>none</fieldname>
-			<type>rowhelper</type>
-			<rowhelper>
-				<rowhelperfield>
-					<fielddescr>Record</fielddescr>
-					<fieldname>hostname</fieldname>
-					<description>Enter the Host Name (Example: www)</description>
-					<type>input</type>
-					<size>10</size>
-				</rowhelperfield>
-				<rowhelperfield>
-					<fielddescr>Type</fielddescr>
-					<fieldname>hosttype</fieldname>
-					<description>Select record type for this host.</description>
-					<type>select</type>
-					<options>
-						<option><name>A</name><value>A</value></option>
-						<option><name>AAAA</name><value>AAAA</value></option>
-						<option><name>DNAME</name><value>DNAME</value></option>
-						<option><name>MX</name><value>MX</value></option>
-						<option><name>CNAME</name><value>CNAME</value></option>
-						<option><name>NS</name><value>NS</value></option>
-						<option><name>LOC</name><value>LOC</value></option>
-						<option><name>SRV</name><value>SRV</value></option>
-						<option><name>PTR</name><value>PTR</value></option>
-						<option><name>TXT</name><value>TXT</value></option>
-						<option><name>SPF</name><value>SPF</value></option>
-					</options>
-				</rowhelperfield>
-				<rowhelperfield>
-					<fielddescr>Priority</fielddescr>
-					<fieldname>hostvalue</fieldname>
-					<description>Priority for MX record. (Example: 10 or 20)</description>
-					<type>input</type>
-					<size>3</size>
-				</rowhelperfield>
-				<rowhelperfield>
-					<fielddescr>Alias or IP address</fielddescr>
-					<fieldname>hostdst</fieldname>
-					<description>Enter the IP address or FQDN destination for domain's MX (Example: 10.31.11.1 or
-		mail.example.com)</description>
-					<type>input</type>
-					<size>35</size>
-				</rowhelperfield>
-				<movable>on</movable>
-			</rowhelper>
-		</field> -->
-		<!-- <field>
-			<fieldname>regdhcpstatic</fieldname>
-			<fielddescr>Register DHCP Static Mappings</fielddescr>
-			<description>If this option is set, then DHCP static mappings will be registered in DNS, so that
-		their name can be resolved.</description>
-			<type>checkbox</type>
-		</field> -->
 		<field>
 			<type>listtopic</type>
 			<name>Zone Records</name>

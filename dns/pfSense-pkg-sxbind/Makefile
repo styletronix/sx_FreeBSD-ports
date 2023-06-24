@@ -2,7 +2,7 @@
 
 PORTNAME=	pfSense-pkg-sxbind
 PORTVERSION=	1.1
-PORTREVISION= 3
+PORTREVISION= 6
 CATEGORIES=	dns
 MASTER_SITES=	# empty
 DISTFILES=	# empty
@@ -28,14 +28,21 @@ do-install:
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/shortcuts
 	${MKDIR} ${STAGEDIR}${PREFIX}/www/widgets/widgets
 
-	
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/sxbind_acls.xml \
+		${STAGEDIR}${PREFIX}/pkg
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/sxbind_backup.php \
+		${STAGEDIR}${PREFIX}/pkg
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/sxbind_rndc_conf.template \
+		${STAGEDIR}${PREFIX}/pkg
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/sxbind_named_conf.template \
 		${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/sxbind_sync.xml \
 		${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/sxbind_views.xml \
 		${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/sxbind_zoneparser.inc \
+		${STAGEDIR}${PREFIX}/pkg
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/sxbind_zones.js \
 		${STAGEDIR}${PREFIX}/pkg
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/pkg/sxbind_zones.xml \
 		${STAGEDIR}${PREFIX}/pkg
@@ -58,19 +65,17 @@ do-install:
 
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/sxbind_dump.php \
 		${STAGEDIR}${PREFIX}/www
-	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/sxbind_tools.php \
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/sxbind_keys.php \
 		${STAGEDIR}${PREFIX}/www
-	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/sxbind_zoneEdit.php \
-		${STAGEDIR}${PREFIX}/www
-	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/sxbind.inc \
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/sxbind_zone_edit.php \
 		${STAGEDIR}${PREFIX}/www
 
 	@${REINPLACE_CMD} -i '' -e "s|%%PKGVERSION%%|${PKGVERSION}|" \
 		${STAGEDIR}${DATADIR}/info.xml \
-		${STAGEDIR}${PREFIX}/pkg/sxbind.xml \
 		${STAGEDIR}${PREFIX}/pkg/sxbind_acls.xml \
 		${STAGEDIR}${PREFIX}/pkg/sxbind_sync.xml \
 		${STAGEDIR}${PREFIX}/pkg/sxbind_views.xml \
 		${STAGEDIR}${PREFIX}/pkg/sxbind_zones.xml \
+		${STAGEDIR}${PREFIX}/pkg/sxbind.xml \
 
 .include <bsd.port.mk>

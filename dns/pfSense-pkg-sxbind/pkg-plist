@@ -1,13 +1,20 @@
 /etc/inc/priv/sxbind.priv.inc
-pkg/sxbind.inc
-pkg/sxbind.xml
 pkg/sxbind_acls.xml
+pkg/sxbind_backup.php
+pkg/sxbind_named_conf.template
+pkg/sxbind_rndc_conf.template
 pkg/sxbind_sync.xml
 pkg/sxbind_views.xml
 pkg/sxbind_zones.xml
 pkg/sxbind_zoneparser.inc
+pkg/sxbind_zones.js
+pkg/sxbind.inc
+pkg/sxbind.xml
 %%DATADIR%%/info.xml
 www/shortcuts/pkg_sxbind.inc
 www/widgets/widgets/sxbind.widget.php
+www/sxbind_dump.php
+www/sxbind_keys.php
+www/sxbind_zone_edit.php
 @dir /etc/inc/priv
 @dir /etc/inc

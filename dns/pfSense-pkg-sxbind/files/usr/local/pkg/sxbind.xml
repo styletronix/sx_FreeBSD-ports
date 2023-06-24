@@ -64,12 +64,12 @@
 			<url>/pkg.php?xml=sxbind_zones.xml</url>
 		</tab>
 		<tab>
-			<text>Tools</text>
-			<url>/sxbind_tools.php</url>
+			<text>TSIG-Keys</text>
+			<url>/sxbind_keys.php</url>
 		</tab>
 		<tab>
 			<text>Edit Zone DB</text>
-			<url>/sxbind_zoneEdit.php</url>
+			<url>/sxbind_zone_edit.php</url>
 		</tab>
 		<tab>
 			<text>Sync</text>
@@ -90,6 +90,39 @@
 				Disable DNS Forwarder and Resolver services on selected interfaces before enabling
 				BIND.
 			</sethelp>
+			<type>checkbox</type>
+		</field>
+		<!-- <field>
+			<fielddescr>BIND DNSBL support mode</fielddescr>
+			<fieldname>bind_dnsbl_support</fieldname>
+			<description>
+				<![CDATA[
+				This option automatically configures unbound and bind to coexist. So you can use unbound with pflocker for DNSBL. 
+				<b>BIND first:</b> Bind will use port 53 and unbound is used as forwarder for bind. In this way, everything which is not resolvable by bind, will be handled by unbound. Statistiks in pfBlocker will only contain forwarded DNS querys and source for those querys will always be localhost.
+				<b>UNBOUND first: </b> All querys are handled by unbound. All Domains which are configured in BIND will be forwarded to BIND for lookup. All other querys are handled as defined in Unbound. In this mode, all pfBlocker fetures are available.
+				]]>
+			</descriptionb>
+			<type>select</type>
+			<options>
+				<option>
+					<name>none</name>
+					<value>none</value>
+				</option>
+				<option>
+					<name>Bind first</name>
+					<value>bind_first</value>
+				</option>
+				<option>
+					<name>Unbound first</name>
+					<value>unbound_first</value>
+				</option>
+			</options>
+		</field> -->
+		<field>
+			<fielddescr>Auto Backup dynamic Zones</fielddescr>
+			<fieldname>dynamiczonebackup</fieldname>
+			<description>Automatically create a backup of dynamic zones in config file every 30min
+				if they have any changes.</description>
 			<type>checkbox</type>
 		</field>
 		<field>
@@ -450,6 +483,7 @@
 		sxbind_sync();
 	</custom_php_resync_config_command>
 	<custom_php_install_command>
+		sxbind_migrate_from_bind(false);
 		sxbind_write_rcfile();
 	</custom_php_install_command>
 </packagegui>
