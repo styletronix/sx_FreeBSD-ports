@@ -71,7 +71,7 @@ $pgtitle = array(gettext("Services"), gettext("Bind Tools"));
 $shortcut_section = "sxbind";
 include("head.inc");
 
-get_top_tabs();
+sxbind_display_top_tabs();
 
 if ($input_errors) {
     print_input_errors($input_errors);

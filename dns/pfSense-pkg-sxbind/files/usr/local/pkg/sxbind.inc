@@ -120,7 +120,7 @@ function sxbind_escape_dns_string($val)
 	$replace = ['\\\\', '\\"', '\\;'];
 	return '"' . str_replace($search, $replace, $val) . '"';
 }
-function get_top_tabs()
+function sxbind_display_top_tabs()
 {
 	$active = basename($_SERVER['PHP_SELF']);
 	if ($active == 'pkg_edit.php') {
@@ -131,7 +131,7 @@ function get_top_tabs()
 	$tab_array[] = array(gettext("ACLs"), (($active == 'sxbind_acls.xml') ? true : false), "/pkg_edit.php?xml=sxbind_acls.xml");
 	$tab_array[] = array(gettext("Views"), (($active == 'sxbind_views.xml') ? true : false), "/pkg_edit.php?xml=sxbind_views.xml");
 	$tab_array[] = array(gettext("Zones"), (($active == 'sxbind_zones.xml') ? true : false), "/pkg_edit.php?xml=sxbind_zones.xml");
-	$tab_array[] = array(gettext("TSIG-Keys"), (($active == 'sxbind_keys.php') ? true : false), "/sxbind_tools.php");
+	$tab_array[] = array(gettext("TSIG-Keys"), (($active == 'sxbind_keys.php') ? true : false), "/sxbind_keys.php");
 	$tab_array[] = array(gettext("Edit Zone DB"), (($active == 'sxbind_zone_edit.php') ? true : false), "/sxbind_zone_edit.php");
 	$tab_array[] = array(gettext("Sync"), (($active == 'sxbind_sync.xml') ? true : false), "/pkg_edit.php?xml=sxbind_sync.xml");
 	display_top_tabs($tab_array);
@@ -547,6 +547,7 @@ logging {
 		print-category yes;
 		severity {$log_severity};
 		};
+
 EOD;
 			foreach ($log_categories as $category) {
 				$logging .= "\tcategory {$category} { custom; };\n";
@@ -554,8 +555,46 @@ EOD;
 			$logging .= "};";
 		}
 	} else {
-		$logging .= "logging { category default { null; }; };";
+		$logging = <<<EOD
+logging { 
+	category default { null; };
+};"
+
+EOD;
 	}
+
+	if ($bind['rate_enabled'] == "on") {
+		// Check response rate limit option removal if not on
+		//https://kb.isc.org/article/AA-01000/0/A-Quick-Introduction-to-Response-Rate-Limiting.html
+		//http://ss.vix.su/~vjs/rl-arm.html
+
+		$ratelimit = 'rate-limit {' . "\n";
+		$ratelimit .= 'responses-per-second ' . ($bind['rate_limit'] ? $bind['rate_limit'] : '15') . ";\n";
+		$ratelimit .= 'log-only ' . ($bind['log_only'] == 'no' ? 'no' : 'yes') . ";\n";
+		$ratelimit .= '};';
+	} else {
+		$ratelimit = '';
+	}
+
+	// Add ACLS to config
+	if (!is_array($config['installedpackages']['sxbindacls']) || !is_array($config['installedpackages']['sxbindacls']['config'])) {
+		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
+			array("name" => "none", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
+		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
+			array("name" => "any", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
+		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
+			array("name" => "localhost", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
+		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
+			array("name" => "localnets", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
+		write_config("Created BIND Built-in ACLs");
+	}
+	$acls = sxbind_get_bind_conf_acls(config_get_path('installedpackages/sxbindacls/config', []));
+
+	// Add Views
+	$views = sxbind_get_bind_conf_views(
+		config_get_path('installedpackages/sxbindviews/config', []),
+		config_get_path('installedpackages/sxbindzone/config', [])
+	);
 
 	// Other config
 	$param = [
@@ -564,28 +603,24 @@ EOD;
 		'[custom_global_settings]' => base64_decode($bind['bind_global_settings']),
 		'[ram_limit]' => $bind['bind_ram_limit'] ? $bind['bind_ram_limit'] : "256M",
 		'[dnssec_validation]' => $bind['bind_dnssec_validation'] == 'on' ? 'yes' : ($bind['bind_dnssec_validation'] == 'off' ? 'no' : 'auto'),
-		'[rate-limit]' => $bind['rate_limit'] ? $bind['rate_limit'] : "15",
-		'[log_only]' => $bind['log_only'] == "no" ? "no" : "yes",
 		'[listenport]' => $bind['listenport'] == "" ? "53" : $bind['listenport'],
-		'[listenonv6]' => $bind_listenonv6 == "" || !array_key_exists("ipv6allow", $config['system']) ? "none;" : $bind_listenonv6,
+		'[listenonv6]' => $bind_listenonv6 == "" ? "none;" : $bind_listenonv6,
 		'[listenon]' => $bind_listenon == "" ? "none;" : $bind_listenon,
 		'[notify]' => $bind['bind_notify'] == 'on' ? 'yes' : 'no',
 		'[hide_version]' => $bind['hide_version'] == 'on' ? 'version none;' : '',
 		'[forwarder_ips]' => $forwarder_ips,
 		'[logging]' => $logging,
-		'[custom_options]' => base64_decode($bind['bind_custom_options'])
+		'[custom_options]' => base64_decode($bind['bind_custom_options']),
+		'[rate_limit]' => $ratelimit,
+		'[acls]' => $acls,
+		'[views]' => $views
 	];
 
-	$bind_conf = file_get_contents('/usr/local/pkg/sxbind_named_conf.template');
-
-	if ($bind['rate_enabled'] != "on") {
-		// Check response rate limit option removal if not on
-		//https://kb.isc.org/article/AA-01000/0/A-Quick-Introduction-to-Response-Rate-Limiting.html
-		//http://ss.vix.su/~vjs/rl-arm.html
-
-		$re = '/^rate-limit {[\S\s]*?^};$/m';
-		$bind_conf = preg_replace($re, '', $bind_conf, 1);
+	$bind_conf = $bind['named_conf_replacement'];
+	if (!$bind_conf || trim($bind_conf) == "") {
+		$bind_conf = file_get_contents('/usr/local/pkg/sxbind_named_conf.template');
 	}
+
 	foreach ($param as $key => $value) {
 		$bind_conf = str_replace($key, $value, $bind_conf);
 	}
@@ -652,7 +687,10 @@ function sxbind_get_bind_conf_views($bindview, $bindzone)
 		$rpz_zones = [];
 		foreach ($bindzone as $zone) {
 			if (
-				array_get_path($zone,'rpz') == "on" &&
+				array_get_path(
+					$zone,
+					'rpz'
+				) == "on" &&
 				($zone['disabled'] != "on") && ($zone['view'] == $viewname)
 			) {
 				$rpz_zones[] = reverse_zonename($zone['name'], $zone['reverso'], $zone['reversv6o']);
@@ -793,35 +831,32 @@ function sxbind_get_bind_conf_views($bindview, $bindzone)
 	}
 	return $ret;
 }
-function  sxbind_creaete_named_conf($rndc_key){
+function sxbind_creaete_named_conf($rndc_key)
+{
 	global $config;
 
 	//create named.conf string
-	$bind = config_get_path('installedpackages/sxbind/config'); #$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bind']['config'][0];
+	$bind = config_get_path('installedpackages/sxbind/config/0'); #$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bind']['config'][0];
 	$bind_conf = sxbind_get_bind_conf_from_template($bind, $rndc_key);
 
-	// Add ACLS to config
-	if (!is_array($config['installedpackages']['sxbindacls']) || !is_array($config['installedpackages']['sxbindacls']['config'])) {
-		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
-			array("name" => "none", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
-			array("name" => "any", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
-			array("name" => "localhost", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
-			array("name" => "localnets", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		write_config("Created BIND Built-in ACLs");
-	}
-	$bind_conf .= sxbind_get_bind_conf_acls(
-		config_get_path('installedpackages/sxbindacls/config', []));
-
-	// Add Views
-	$bind_conf .= sxbind_get_bind_conf_views(
-		config_get_path('installedpackages/sxbindviews/config', []), 	
-		config_get_path('installedpackages/sxbindzone/config', [])
-	);
-
 	return $bind_conf;
+}
+function sxbind_tryRestoreZoneDB($zone, $zonefile, &$config_changed)
+{
+	if (!file_exists($zonefile)) {
+		if ($zone['backup']) {
+			$zonestring = base64_decode($zone['backup']);
+			if ($zonestring) {
+				file_put_contents($zonefile, $zonestring);
+				log_error('[sxbind] INFO - Zonefile for zone ' . $zone['name'] . ' restored from config backup');
+				$config_changed = true;
+				return $zonestring;
+			}
+		}
+
+		log_error('[sxbind] WARNING - No Backup for zone ' . $zone['name'] . ' found.');
+		return null;
+	}
 }
 function sxbind_sync($is_remote_sync = false, $zone_only = false)
 {
@@ -835,8 +870,12 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 
 	$config_changed = false;
 	$named_process = "named";
-	$bind_enable = config_get_path('installedpackages/sxbind/config/0/enable_bind',"off") == "on"; # $bind['enable_bind'];
+	$bind_enable = config_get_path('installedpackages/sxbind/config/0/enable_bind', "off") == "on"; # $bind['enable_bind'];
 	$write_config = 0;
+
+	if (!$bind_enable) {
+		goto skip_config;
+	}
 
 	// $bind_dnsbl_support = "none";
 	// if ($bind_enable){
@@ -852,7 +891,7 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 	// 	default:
 	// }
 
-	if (!$zone_only ) {
+	if (!$zone_only) {
 		// Set cron job for backup zone Data.
 		$active = $bind_enable && config_get_path('installedpackages/sxbind/config/0/dynamiczonebackup') == "on";
 		install_cron_job('/usr/bin/nice -n20 /usr/local/bin/php -f /usr/local/pkg/sxbind_backup.php', $active, '*/30');
@@ -1009,22 +1048,9 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 						$zonefile = CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB";
 
 						// Try to restore missing Zonefile from Backup.
+						$tryRestore = false;
 						if (!file_exists($zonefile)) {
-							$restored = false;
-							if ($zone['backup']) {
-								$zonestring = base64_decode($zone['backup']);
-								if ($zonestring) {
-									file_put_contents($zonefile, $zonestring);
-									$config_changed = true;
-									$restored = true;
-								}
-							}
-
-							if (!$restored && file_exists($zonefile . '.backup')) {
-								copy($zonefile . '.backup', $zonefile);
-								$restored = true;
-								$config_changed = true;
-							}
+							$tryRestore = true;
 						}
 
 						// read new and last zonedata to build diff
@@ -1047,7 +1073,7 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 							log_error("[sxbind] INFO: Config file for zone {$zonename} skipped cause nothing changed.");
 						}
 
-						if (!$skipZoneUpdate) {
+						if (!$skipZoneUpdate || $tryRestore) {
 							$process_running = is_process_running($named_process);
 							$zone_conf_orig = $zone_conf;
 							$zone_conf_dynamic = '';
@@ -1065,17 +1091,23 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 							if ($zone['reset_zone'] == "on") {
 								unlink($zonefile);
 								unset($zone['reset_zone']);
+								log_error('[sxbind] WARNING - Zone reset for ' . $zone['name'] . ' was triggered.');
 								$write_config++;
+
+							} elseif ($tryRestore) {
+								$restoredZoneString = sxbind_tryRestoreZoneDB($zone, $zonefile, $config_changed);
+								if ($restoredZoneString) {
+									$current_zone_data_parsed = ZoneParser::parse_rndc_zone_dump($restoredZoneString, $zonename_reverse);
+								}
 							}
 
 							// read current zone data
-							if (file_exists($zonefile)) {
+							if (!$current_zone_data_parsed || file_exists($zonefile)) {
 								$current_zone_data_parsed = ZoneParser::get_zone_dump_parsed($zonetype, $zoneview, $zonename_reverse);
 								if (!$current_zone_data_parsed) {
 									$error = "[sxbind] ERROR: Failed to parse current zone data of zone {$zonename_reverse} .To prevent loose , the Zone remains in the old state. Manual resolve any errors in zone file or performe a reset on the zone from the zone config to fix this issue.\n\n";
 									file_notice("named_config", $error, "sxbind DNS", "", 2);
 									log_error($error);
-
 									// Skip Update
 									continue;
 								}
@@ -1116,9 +1148,9 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 
 							if ($result['success']) {
 								/* Validation successfull
-								Save zone_conf to cache file for comparison on next update. 
-								Do not store in config to prevent replication or backup.
-								*/
+																				Save zone_conf to cache file for comparison on next update. 
+																				Do not store in config to prevent replication or backup.
+																				*/
 								file_put_contents($zone_cache_file, $zone_conf_orig);
 								$data = base64_encode($zone_conf . $zone_conf_dynamic);
 								if ($config['installedpackages']['sxbindzone']['config'][$x]['resultconfig'] != $data) {
@@ -1237,13 +1269,17 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 						chown(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}", "bind");
 						// check if exists slave zone file
 						$rsconfig = "";
+						$zonefile = CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB";
+						// Try to restore missing Zonefile from Backup.
+						sxbind_tryRestoreZoneDB($zone, $zonefile, $config_changed);
+
 						if ($zone['dnssec'] == "on") {
-							if (file_exists(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB.signed")) {
+							if (file_exists($zonefile . '.signed')) {
 								exec("/usr/local/sbin/named-checkzone -D -f raw -o - {$zonename} " . CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB.signed", $slave_file);
 							}
 						} else {
-							if (file_exists(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB")) {
-								$slave_file = file(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB");
+							if (file_exists($zonefile)) {
+								$slave_file = file($zonefile);
 							}
 						}
 						if ($slave_file) {
@@ -1257,7 +1293,6 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 							$config['installedpackages']['sxbindzone']['config'][$x]['resultconfig'] = $data;
 							$write_config++;
 						}
-
 						break;
 
 					case 'forward':
@@ -1267,6 +1302,7 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 							$write_config++;
 						}
 						break;
+
 					default:
 						break;
 				}
@@ -1335,8 +1371,9 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 		chgrp(CHROOT_LOCALBASE . "/var/log", "bind");
 	}
 
+	skip_config:
 	$bind_sh = "/usr/local/etc/rc.d/named.sh";
-	#== "on"
+
 	if ($bind_enable) {
 		chmod($bind_sh, 0755);
 		if (!$restart_required && is_process_running($named_process)) {
@@ -1417,7 +1454,7 @@ function sxbind_sync_on_changes()
 {
 	global $config, $g;
 
-	if (is_array($config['installedpackages'][ 'sxbindsync']['config'])) {
+	if (is_array($config['installedpackages']['sxbindsync']['config'])) {
 		$bind_sync = $config['installedpackages']['sxbindsync']['config'][0];
 		$synconchanges = $bind_sync['synconchanges'];
 		$synctimeout = (int) $bind_sync['synctimeout'] ?: 30;

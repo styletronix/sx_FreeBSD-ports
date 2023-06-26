@@ -191,7 +191,7 @@ if ($input_errors) {
 }
 $zonelist = ZoneParser::get_zonelist();
 
-get_top_tabs();
+sxbind_display_top_tabs();
 
 ?>
 

@@ -464,6 +464,22 @@
 			<advancedfield />
 		</field>
 		<field>
+			<fielddescr>Replace named_conf</fielddescr>
+			<fieldname>named_conf_replacement</fieldname>
+			<description>
+				<![CDATA[
+				You can put your own named.conf here. This will replace all configurations made with this configurator.
+				For simplicity, the configuration of this GUI can be implemented as placeholders in the named.config. For example see /usr/local/pkg/sxbind_named_conf.template
+				For named.conf see: <a href="http://www.freebsd.org/cgi/man.cgi?query=named.conf&apropos=0&sektion=0&manpath=FreeBSD+10.1-RELEASE+and+Ports&arch=default&format=html">named.conf</a> native settings.
+				]]>
+			</description>
+			<type>textarea</type>
+			<cols>65</cols>
+			<rows>5</rows>
+			<encoding>base64</encoding>
+			<advancedfield />
+		</field>
+		<field>
 			<fielddescr>Global Settings</fielddescr>
 			<fieldname>bind_global_settings</fieldname>
 			<description>
