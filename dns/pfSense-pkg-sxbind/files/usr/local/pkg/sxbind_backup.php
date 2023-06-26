@@ -30,21 +30,21 @@ if (config_get_path('installedpackages/sxbind/config/0/dynamiczonebackup') == "o
         if ($zone['type'] == "master") {
             try {
                 $zone_string = ZoneParser::get_zone_as_string($zone);
-
                 if ($zone_string) {
                     $zone_string_enc = base64_encode($zone_string);
                     if ($zone['backup'] != $zone_string_enc) {
                         config_set_path("installedpackages/sxbindzone/config/{$idx}/backup",   $zone_string_enc);
+                        config_set_path("installedpackages/sxbindzone/config/{$idx}/backup_time", time());
+                        log_error('[sxbind] INFO - Backup for Zone ' . $zone['name'] . ' created in config.XML');
                         $writeconfig = true;
                     }
                 }
             } catch (Exception $ex) {
-                log_error('[sxbind] ERROR Could not backup zone ' . $zone['name' . ': ' - $ex->getMessage()]);
+                log_error('[sxbind] ERROR Could not backup zone ' . $zone['name'] . ': ' - $ex->getMessage());
                 continue;
             }
         }
     }
-
     if ($writeconfig) {
         write_config('[sxbind] Backup for master zones created.');
     }

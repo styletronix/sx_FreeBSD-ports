@@ -1,5 +1,8 @@
-# Bind pfsense configuration
-# All custom modifications are removed on config change.
+# This is the template for named.conf
+# All fields with [...] will be replaced by the SXBIND Configuration.
+# You may change the template as you wish. The resulting config file will be overwritten at each config change.
+
+# The rndc_key and the controls section is required for control channel. If you replace this in your template, the zone db can not be edited within sxbind configurator. 
 
 [rndc_key]
 
@@ -23,11 +26,12 @@ options {
 	[custom_options]
 };
 
-rate-limit {
-	responses-per-second [rate_limit];
-	log-only [log_only];
-};
+[rate_limit]
 
 [hide_version]
 
 [logging]
+
+[acls]
+
+[views]

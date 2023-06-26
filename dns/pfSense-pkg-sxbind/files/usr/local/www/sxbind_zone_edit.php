@@ -113,13 +113,13 @@ if ($_POST) {
         http_response_code(501);
         exit;
     }
-    
+
     if ($post["action"] == 'add_rrecord') {
         print('not implemented');
         http_response_code(501);
         exit;
     }
-    
+
     if ($post["action"] == 'thaw' || $thaw == true) {
         if ($zoneview) {
             $ret = ZoneParser::thaw_zone($zoneview, $zonename_reverse);
@@ -191,12 +191,18 @@ get_top_tabs();
 
 $zonelist = [];
 $zonelist_not_master = [];
+$zone_backup = 'No Backup found.';
+
 foreach (ZoneParser::get_zonelist() as $zone) {
     $zonekey = $zone['view'] . '__' . $zone['name'] . '__' . ZoneParser::reverse_zonename($zone) . '__' . $zone['type'];
     if ($zone['type'] == 'master') {
         $zonelist[$zonekey] = ZoneParser::reverse_zonename($zone) . '  (' . $zone['view'] . ')';
     } else {
         $zonelist_not_master[$zonekey] = ZoneParser::reverse_zonename($zone) . '  (' . $zone['view'] . ')';
+    }
+
+    if ($zonekey == $post['current_zone'] && $zone['backup']){
+        $zone_backup = base64_decode($zone['backup']);
     }
 }
 
@@ -269,6 +275,9 @@ if (!empty($savemsg)) {
         </li>
         <li>
             <a data-toggle="tab" href="#tab2">RAW Zonefile</a>
+        </li>
+        <li>
+            <a data-toggle="tab" href="#tab3">Backup</a>
         </li>
     </ul>
 
@@ -510,9 +519,11 @@ if (!empty($savemsg)) {
                                                 }
                                                 ?>
                                             </td>
-                                            <td><button class="btn btn-danger" type="button" value="delete_record" name="action">
-                                                <i class="fa fa-trash icon-embed-btn"></i>
-                                                <?= gettext('Delete') ?></button>
+                                            <td><button class="btn btn-danger" type="button" value="delete_record"
+                                                    name="action">
+                                                    <i class="fa fa-trash icon-embed-btn"></i>
+                                                    <?= gettext('Delete') ?>
+                                                </button>
                                             </td>
                                         </tr>
                                     <? } ?>
@@ -523,24 +534,42 @@ if (!empty($savemsg)) {
                 </div>
             <? } ?>
         </div>
+        <div id="tab3" class="tab-pane fade">
+            <div class="panel panel-default">
+                <div class="panel-heading">
+                    <h2 class="panel-title">
+                        <?= gettext('Last Backup') ?>
+                    </h2>
+                </div>
+                <div class="panel-body">
+                    <div class="form-group">
+                        <div class="col-sm-12 ">
+                            <textarea rows="15" class="form-control" wrap="off" readonly="readonly">
+                                <?= $zone_backup ?></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div id="dlg_updatestatus" class="modal fade" role="dialog" aria-labelledby="dlg_updatestatus" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">×</span>
-                    </button>
-                    <h3 class="modal-title">Aktion</h3>
-                </div>
-                <div class="modal-body">
-                    <div class="form-group">
-                        <label for="dlg_updatestatus_text" class="col-sm-2 control-label">
-                        </label>
-                        <div class="col-sm-8">
-                            <textarea rows="10" class="row-fluid col-sm-10" name="dlg_updatestatus_text"
-                                id="dlg_updatestatus_text" wrap="off">...Loading...</textarea>
+    <div id="dlg_updatestatus" class="modal fade" role="dialog" aria-labelledby="dlg_updatestatus"
+            aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">×</span>
+                        </button>
+                        <h3 class="modal-title">Aktion</h3>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <label for="dlg_updatestatus_text" class="col-sm-2 control-label">
+                            </label>
+                            <div class="col-sm-8">
+                                <textarea rows="10" class="row-fluid col-sm-10" name="dlg_updatestatus_text"
+                                    id="dlg_updatestatus_text" wrap="off">...Loading...</textarea>
                         </div>
                     </div>
                 </div>
@@ -616,8 +645,8 @@ include('foot.inc');
     }
 
     function add_rrecord(rrecord) {
-        data = {action: "add_rrecord"}
-        
+        data = { action: "add_rrecord" }
+
         Object.entries(rrecord).forEach(entry => {
             const [key, value] = entry
             data["rr_" + key] = value
@@ -661,8 +690,8 @@ include('foot.inc');
     }
 
     function update_rrecord(rrecord, rrecordOld) {
-        data = {action: "dupdate_rrecord"}
-        
+        data = { action: "dupdate_rrecord" }
+
         Object.entries(rrecord).forEach(entry => {
             const [key, value] = entry
             data["rr_" + key] = value
@@ -695,15 +724,15 @@ include('foot.inc');
         })
 
         $("button[value=\"add_record\"]").on('click', function () {
-           var $btn = $(this)
+            var $btn = $(this)
             $btn.button('loading')
             var data = getDataFromRow($btn.closest("tr"));
-            
+
             add_rrecord(data)
-                .then(function(){
+                .then(function () {
                     alert("Added")
                 })
-                .finally(function(){
+                .finally(function () {
                     $btn.button('reset')
                 })
         })
@@ -721,11 +750,11 @@ include('foot.inc');
 
             var id = $btn.closest("[data-id]").attr('data-id');
             var tr = $btn.closest("tr")
-           delete_rrecord(id)
-            .then(function(){
+            delete_rrecord(id)
+                .then(function () {
                     tr.remove()
                 })
-                .finally(function(){
+                .finally(function () {
                     $btn.button('reset')
                 })
         })
