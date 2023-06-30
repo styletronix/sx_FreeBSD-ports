@@ -25,10 +25,12 @@ require_once("config.inc");
 require_once("/usr/local/pkg/sxbind_zoneparser.inc");
 require_once("/usr/local/pkg/sxbind.inc");
 
+$ZoneParser = ZoneParser::get_instance();
+
 if ($_POST) {
     if ($_POST['action'] == 'create_tsig') {
         $name = '"' . htmlspecialchars_decode($_POST['tsig_name']) . '"';
-        $key = ZoneParser::create_tsig_key($name);
+        $key = $ZoneParser->create_tsig_key($name);
         print($key);
         exit;
     }
@@ -58,7 +60,7 @@ if ($_POST) {
 
     if ($_POST['action'] == 'convert_ip_to_ptr') {
         try {
-            print(ZoneParser::ip_to_ptr($_POST['ip']));
+            print($ZoneParser->ip_to_ptr($_POST['ip']));
             exit;
         } catch (Exception $ex) {
             die(500);

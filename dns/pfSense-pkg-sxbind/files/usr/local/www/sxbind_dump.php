@@ -8,6 +8,8 @@ require_once("config.inc");
 require_once("/usr/local/pkg/sxbind_zoneparser.inc");
 require_once("sxbind.inc");
 
+$ZoneParser = ZoneParser::get_instance();
+
 function exists_record_by_Name($entries, $name, $types = ['A', 'AAAA', 'PTR'])
 {
     foreach ($entries as $entry) {
@@ -18,11 +20,12 @@ function exists_record_by_Name($entries, $name, $types = ['A', 'AAAA', 'PTR'])
     return false;
 }
 if ($_REQUEST['loadData']) {
+    
     $message = "";
     $entries = null;
 
     try {
-        $entries = ZoneParser::get_rndc_zone_dump_parsed();
+        $entries = $ZoneParser->get_rndc_zone_dump_parsed();
     } catch (Exception $e) {
         http_response_code(422);
         header('Content-Type: application/json; charset=UTF-8');
@@ -99,7 +102,7 @@ if ($_REQUEST['download']) {
                 }
                 $file = CHROOT_LOCALBASE . '/etc/namedb/named_dump.db';
 
-                if (!ZoneParser::waitfor_string_in_file($file, "; Dump complete", 30)) {
+                if (!$ZoneParser->waitfor_string_in_file($file, "; Dump complete", 30)) {
                     die('Timeout during zone dump');
                 }
                 break;
@@ -136,7 +139,7 @@ if ($_REQUEST['action'] == "delete_host") {
     }
 
     try {
-        $result = ZoneParser::addremove_items_to_zone($item['zonename'], $item['view'], [], [$item]);
+        $result = $ZoneParser->addremove_items_to_zone($item['zonename'], $item['view'], [], [$item]);
     } catch (Exception $e) {
         print("[Exception] ");
         print($e->getMessage());
@@ -166,7 +169,7 @@ if ($_REQUEST['action'] == "add_host") {
         return;
     }
     try {
-        $result = ZoneParser::addremove_items_to_zone($item['zone'], $item['view'], [$item], []);
+        $result = $ZoneParser->addremove_items_to_zone($item['zone'], $item['view'], [$item], []);
     } catch (Exception $e) {
         print("[Exception] ");
         print($e->getMessage());
@@ -189,7 +192,7 @@ include("head.inc");
 if ($input_errors) {
     print_input_errors($input_errors);
 }
-$zonelist = ZoneParser::get_zonelist();
+$zonelist = $ZoneParser->get_zonelist();
 
 sxbind_display_top_tabs();
 
@@ -256,8 +259,8 @@ sxbind_display_top_tabs();
                             <?= gettext("All Zones") ?>
                         </option>
                         <?php foreach ($zonelist as $zone): ?>
-                            <option value="<?= htmlspecialchars(ZoneParser::reverse_zonename($zone) . '.') ?>">
-                                <?= htmlspecialchars(ZoneParser::reverse_zonename($zone) . '. (' . $zone['type'] . ')') ?>
+                            <option value="<?= htmlspecialchars($ZoneParser->reverse_zonename($zone) . '.') ?>">
+                                <?= htmlspecialchars($ZoneParser->reverse_zonename($zone) . '. (' . $zone['type'] . ')') ?>
                             </option>
                         <?php endforeach; ?>
                     </select>

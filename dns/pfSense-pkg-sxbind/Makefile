@@ -1,12 +1,8 @@
 # $FreeBSD$
 
 PORTNAME=	pfSense-pkg-sxbind
-PORTVERSION=	1.1
-<<<<<<< .merge_file_Qp0IYI
-PORTREVISION= 17
-=======
-PORTREVISION= 16
->>>>>>> .merge_file_3Rm66Q
+PORTVERSION=	1.2
+PORTREVISION= 18
 CATEGORIES=	dns
 MASTER_SITES=	# empty
 DISTFILES=	# empty

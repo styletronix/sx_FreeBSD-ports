@@ -32,11 +32,52 @@ namespace sxbind {
 
     class ZoneParser
     {
-        const BIND_LOCALBASE = '/usr/local';
-        const CHROOT_LOCALBASE = '/var/etc/named';
-        const CONFIGPREFIX = 'sx';
-        const RECORDTYPES_EXPANDABLE = ['A', 'AAAA', 'CNAME', 'TXT', 'SPF', 'PTR', 'MX', 'SOA', 'SRV', 'NS'];
-        const REQUIRED_FIELDS = [
+        private static $instance;
+        public static function get_instance(){
+            if (!self::$instance){
+                self::$instance = new ZoneParser();
+            }
+
+            return self::$instance;
+        }
+
+        public function __construct($config = null) {
+            $this->LOCALBASE = '/usr/local';
+            $this->CHROOT_LOCALBASE = '/var/etc/named';
+            $this->PATH_RNDC_CONF = $this->LOCALBASE . '/etc/rndc.conf';
+            $this->CMD_RNDC = '/usr/local/sbin/rndc -r -c "' . $this->PATH_RNDC_CONF . '" ';
+            $this->PATH_DUMPFILE = $this->CHROOT_LOCALBASE . '/etc/namedb/named_dump.db';
+
+            if ($config){
+                if ($config['localbase']) {
+                    $this->LOCALBASE = $config['localbase'];     
+                }
+                if ($config['chroot_localbase']) {
+                    $this->CHROOT_LOCALBASE = $config['chroot_localbase'];
+                }
+            }
+
+            if (file_exists('/usr/local/sbin/named-checkzone')) {
+                $this->PATH_CHECKZONE = '/usr/local/sbin/named-checkzone';
+            } else {
+                $this->PATH_CHECKZONE = '/usr/local/bin/named-checkzone';
+            }
+
+            if (file_exists('/usr/local/sbin/named-compilezone')) {
+                $this->PATH_COMPILEZONE = '/usr/local/sbin/named-compilezone';
+            } else {
+                $this->PATH_COMPILEZONE = '/usr/local/bin/named-compilezone';
+            }
+
+            if (!self::$instance) {
+                self::$instance = $this;
+            }
+        }
+
+        public $LOCALBASE;
+        public $CHROOT_LOCALBASE;
+        public  $RECORDTYPES_EXPANDABLE = ['A', 'AAAA', 'CNAME', 'TXT', 'SPF', 'PTR', 'MX', 'SOA', 'SRV', 'NS'];
+        public $REQUIRED_FIELDS = [
             'A' => ['name', 'ttl', 'ip'],
             'AAAA' => ['name', 'ttl', 'ip'],
             'CNAME' => ['name', 'ttl', 'host'],
@@ -48,7 +89,7 @@ namespace sxbind {
             'SRV' => ['name', 'ttl', 'priority', 'weight', 'port', 'host'],
             'NS' => ['name', 'ttl', 'nameserver']
         ];
-        const RECORDTYPES = [
+        public $RECORDTYPES = [
             'A',
             'AAAA',
             'CNAME',
@@ -100,20 +141,21 @@ namespace sxbind {
             'AXFR',
             'TLSA'
         ];
-        public static $PATH_CHECKZONE;
-        public static $PATH_COMPILEZONE;
-        const PATH_RNDC_CONF = self::BIND_LOCALBASE . '/etc/rndc.conf';
-        const CMD_RNDC = '/usr/local/sbin/rndc -r -c "' . self::PATH_RNDC_CONF . '" ';
-        const PATH_DUMPFILE = self::CHROOT_LOCALBASE . '/etc/namedb/named_dump.db';
+
+        public $PATH_CHECKZONE;
+        public $PATH_COMPILEZONE;
+        public $PATH_RNDC_CONF;
+        public $CMD_RNDC;
+        public $PATH_DUMPFILE;
         /**
          * Summary of freeze_zone
          * @param mixed $zoneview  Zoneview
          * @param mixed $fullzonename The full zone name including ...arpa for reverse zones if applicable.
          * @return array result_code = resultode from rndc freeze. message = resultmessage. success = true if successfull.
          */
-        public static function freeze_zone(string $zoneview, string $fullzonename)
+        public  function freeze_zone(string $zoneview, string $fullzonename)
         {
-            $rndc = self::CMD_RNDC;
+            $rndc =  $this->CMD_RNDC;
 
             if (str_ends_with($zoneview, ' (signed)')) {
                 $zoneview = substr($zoneview, 0, -9);
@@ -129,9 +171,9 @@ namespace sxbind {
         }
 
 
-        public static function thaw_zone(string $view, string $zonename)
+        public   function thaw_zone(string $view, string $zonename)
         {
-            $rndc = self::CMD_RNDC;
+            $rndc =  $this->CMD_RNDC;
             $zonename = rtrim($zonename, '.');
             if (str_ends_with($view, ' (signed)')) {
                 $view = substr($view, 0, -9);
@@ -145,9 +187,9 @@ namespace sxbind {
                 'success' => ($resultCode == 0 ? true : false)
             ];
         }
-        public static function thaw_all()
+        public   function thaw_all()
         {
-            $rndc = self::CMD_RNDC;
+            $rndc =  $this->CMD_RNDC;
             exec("{$rndc} thaw " . ' 2>&1', $output, $resultCode);
 
             return [
@@ -166,7 +208,7 @@ namespace sxbind {
          * @param string $zonename   The full zone name including ...arpa for reverse zones if applicable.
          * @return array result_code = resultode from checkzone. message = resultmessage. success = true if successfull.
          */
-        public static function save_zonefile(string $data, string $zonetype, string $view, string $zonename)
+        public   function save_zonefile(string $data, string $zonetype, string $view, string $zonename)
         {
             global $config;
             // Replace all kind of linebreak styles with LF (unix style)
@@ -174,7 +216,7 @@ namespace sxbind {
             $dataexploded = explode("\n", $data);
 
             // parse zone data and increment serial
-            $zone_compiled = self::parse_rndc_zone_dump($data, $zonename);
+            $zone_compiled =  $this->parse_rndc_zone_dump($data, $zonename);
             foreach ($zone_compiled as $record) {
                 if ($record['type'] == 'SOA') {
                     $soa_record = $record;
@@ -187,11 +229,11 @@ namespace sxbind {
 
                 // combine raw text format of data with parsed soa record
                 $data1 = array_slice($dataexploded, 0, $soa_record['_index']);
-                self::collapse_zone_record($soa_record);
+                 $this->collapse_zone_record($soa_record);
                 $data2 = array_slice($dataexploded, $soa_record['_index'] + $soa_record['_rowcount']);
 
                 $dataMerged = $data1;
-                $dataMerged[] = self::zone_record_to_string($soa_record);
+                $dataMerged[] =  $this->zone_record_to_string($soa_record);
                 $dataMerged = array_merge($dataMerged, $data2);
 
                 $data = implode("\n", $dataMerged);
@@ -202,7 +244,7 @@ namespace sxbind {
             }
 
             $zonename = rtrim($zonename, '.');
-            $rzone = self::re_reverse_zonename($zonename);
+            $rzone =  $this->re_reverse_zonename($zonename);
             $tempDB = tempnam("/tmp", "validate_zone");
             file_put_contents($tempDB, $data);
 
@@ -213,16 +255,16 @@ namespace sxbind {
             // validate and save to DB if successfull.
             // Defaut format text for master zones.
             // TODO: detect the zone format. text|raw|raw=|map
-            exec(self::$PATH_CHECKZONE . ' -i none -k ignore -m ignore -M ignore -n ignore -S ignore -F text ' .
-                '-o ' . escapeshellarg(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$view}/{$rzone}.DB") . ' ' .
+            exec($this->PATH_CHECKZONE . ' -i none -k ignore -m ignore -M ignore -n ignore -S ignore -F text ' .
+                '-o ' . escapeshellarg($this->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$view}/{$rzone}.DB") . ' ' .
                 escapeshellarg($zonename) . ' ' .
                 escapeshellarg($tempDB) . ' 2>&1', $output, $resultCode);
 
             if ($resultCode == 0) {
-                if (is_array($config['installedpackages'][self::CONFIGPREFIX . 'bindzone'])) {
-                    $bindzone = $config['installedpackages'][self::CONFIGPREFIX . 'bindzone'];
+                if (is_array($config['installedpackages']['sxbindzone'])) {
+                    $bindzone = $config['installedpackages']['sxbindzone'];
                     for ($x = 0; $x < sizeof($bindzone); $x++) {
-                        $zone = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x];
+                        $zone = $config['installedpackages']['sxbindzone']['config'][$x];
                         if ($zone['view'] == $view && $zone['name'] == $rzone && $zone['type'] == $zonetype) {
                             if ($zone['resultconfig'] != $data) {
                                 $zone['resultconfig'] = $data;
@@ -246,9 +288,9 @@ namespace sxbind {
          * Returns the complete Zone Dump including all Zones, served by BIND. This includes all master, slave and automatically created Zones.
          * @return array|bool Returns array of zone records or false if failed.
          */
-        public static function get_rndc_zone_dump_parsed()
+        public   function get_rndc_zone_dump_parsed()
         {
-            return self::parse_rndc_zone_dump(self::get_rndc_zone_dump());
+            return  $this->parse_rndc_zone_dump( $this->get_rndc_zone_dump());
         }
 
         /**
@@ -257,7 +299,7 @@ namespace sxbind {
          * @throws \Exception
          * @return string   Returns the key as string as used in named.conf or rndc.conf
          */
-        public static function create_tsig_key($name)
+        public   function create_tsig_key($name)
         {
             if (!$name) {
                 throw new \Exception("Name is required for Key generation.", 1);
@@ -275,9 +317,9 @@ namespace sxbind {
          * @throws \Exception Throws an exception if failed.
          * @return string|bool Returns the complete Zone Dump as string or false if failed.
          */
-        public static function get_rndc_zone_dump()
+        public   function get_rndc_zone_dump()
         {
-            $rndc = self::CMD_RNDC;
+            $rndc =  $this->CMD_RNDC;
 
             $output = null;
             $retval = null;
@@ -296,9 +338,9 @@ namespace sxbind {
                     throw new \Exception('Exception during zone compiling. Code:' . $retval . "\n" . implode("\n", $output));
                 }
 
-                $dumpFile = self::PATH_DUMPFILE;
+                $dumpFile =  $this->PATH_DUMPFILE;
 
-                if (self::waitfor_string_in_file($dumpFile, "; Dump complete", 30)) {
+                if ( $this->waitfor_string_in_file($dumpFile, "; Dump complete", 30)) {
                     return file_get_contents($dumpFile);
                 }
             } finally {
@@ -313,13 +355,13 @@ namespace sxbind {
          * @throws \Exception Throws an exception if failed.
          * @return string
          */
-        public static function get_zone_as_string($zoneconfig){
-            $zonename = self::get_zone_fullname($zoneconfig);
-            return self::compilezone($zoneconfig['view'], $zonename, $zoneconfig['type']);
+        public   function get_zone_as_string($zoneconfig){
+            $zonename =  $this->get_zone_fullname($zoneconfig);
+            return  $this->compilezone($zoneconfig['view'], $zonename, $zoneconfig['type']);
         }
-        public static function get_zone_as_string_2($view, $zone, $type = 'master'){
+        public   function get_zone_as_string_2($view, $zone, $type = 'master'){
             $zonename = '';
-            return self::compilezone($view, $zonename, $type);
+            return  $this->compilezone($view, $zonename, $type);
         }
         /**
          * Compiles the Bind DNS Zone to a human readable and parseable string.
@@ -329,12 +371,12 @@ namespace sxbind {
          * @throws \Exception Throws an exception if failed.
          * @return string Returns parsed and normalized zone DB as string.
          */
-        public static function compilezone($view, $zone, $type = 'master')
+        public   function compilezone($view, $zone, $type = 'master')
         {
-            $revname = self::re_reverse_zonename($zone);
-            $zoneFile = CHROOT_LOCALBASE . "/etc/namedb/{$type}/{$view}/{$revname}.DB";
+            $revname =  $this->re_reverse_zonename($zone);
+            $zoneFile = $this->CHROOT_LOCALBASE . "/etc/namedb/{$type}/{$view}/{$revname}.DB";
             if (!file_exists($zoneFile)) {
-                $zoneFile = CHROOT_LOCALBASE . "/etc/namedb/slave/{$view}/{$revname}.DB";
+                $zoneFile = $this->CHROOT_LOCALBASE . "/etc/namedb/slave/{$view}/{$revname}.DB";
                 if (!file_exists($zoneFile)) {
                     throw new \Exception('Zone file not found: ' . $zoneFile);
                 }
@@ -344,9 +386,9 @@ namespace sxbind {
             $output = null;
             $retval = null;
 
-            exec(self::$PATH_COMPILEZONE . ' -j -f text -F text -q -i none -s full -o ' . escapeshellarg($tmpfname) . " " . escapeshellarg($zone) . " " . escapeshellarg($zoneFile) . ' 2>&1', $output, $retval);
+            exec($this->PATH_COMPILEZONE . ' -j -f text -F text -q -i none -s full -o ' . escapeshellarg($tmpfname) . " " . escapeshellarg($zone) . " " . escapeshellarg($zoneFile) . ' 2>&1', $output, $retval);
             if ($retval != 0) {
-                exec(self::$PATH_COMPILEZONE . ' -j -f raw -F text -q -i none -s full -o ' . escapeshellarg($tmpfname) . " " . escapeshellarg($zone) . " " . escapeshellarg($zoneFile) . ' 2>&1', $output, $retval);
+                exec($this->PATH_COMPILEZONE . ' -j -f raw -F text -q -i none -s full -o ' . escapeshellarg($tmpfname) . " " . escapeshellarg($zone) . " " . escapeshellarg($zoneFile) . ' 2>&1', $output, $retval);
                 if ($retval !== 0) {
                     throw new \Exception('Exception during zone compiling. Code:' . $retval . " \n" . implode("\n", $output));
                 }
@@ -368,17 +410,17 @@ namespace sxbind {
          * @param bool  $freeze_thaw
          * @return bool
          */
-        public static function addremove_items_from_zone($zone, $view, $items_add, $items_remove, $type = 'master', $freeze_thaw = true)
+        public   function addremove_items_from_zone($zone, $view, $items_add, $items_remove, $type = 'master', $freeze_thaw = true)
         {
-            $rndc = self::CMD_RNDC;
+            $rndc =  $this->CMD_RNDC;
             $changed = false;
 
             if ($freeze_thaw) {
-                self::freeze_zone($view, $zone);
+                 $this->freeze_zone($view, $zone);
             }
 
             try {
-                $zoneData = self::parse_rndc_zone_dump(self::compilezone($view, $zone));
+                $zoneData =  $this->parse_rndc_zone_dump( $this->compilezone($view, $zone));
                 $zoneDataNew = [];
 
                 foreach ($zoneData as $record) {
@@ -399,23 +441,23 @@ namespace sxbind {
                         }
                     }
 
-                    array_push($zoneDataNew, self::zone_record_to_string($record));
+                    array_push($zoneDataNew,  $this->zone_record_to_string($record));
                 }
 
                 foreach ($items_add as $item) {
-                    array_push($zoneDataNew, self::zone_record_to_string($item));
+                    array_push($zoneDataNew,  $this->zone_record_to_string($item));
                     $changed = true;
                 }
 
                 if ($changed) {
-                    self::save_zonefile(implode("\n", $zoneDataNew) . "\n", $type, $view, $zone);
+                     $this->save_zonefile(implode("\n", $zoneDataNew) . "\n", $type, $view, $zone);
                 }
             } catch (\Exception $e) {
                 throw $e;
 
             } finally {
                 if ($freeze_thaw) {
-                    self::thaw_zone($view, $zone);
+                     $this->thaw_zone($view, $zone);
                 }
                 unset($zoneDataNew);
                 unset($zoneData);
@@ -442,7 +484,7 @@ namespace sxbind {
          * @param bool $include_comment_only True to include Datarows which only contains comment. If false, those rows are ignored.
          * @return array Returns array of zone record objects.
          */
-        public static function parse_rndc_zone_dump($value, $zone = '', $include_comment_only = false)
+        public  function parse_rndc_zone_dump($value, $zone = '', $include_comment_only = false)
         {
             $reg_host = "{(?<name>.+?)?(?:\s+?(?<ttl>\d*))?\s+(?<class>IN)?\s+(?<type>\p{L}+)\s+(?<rdata>.*)}";
             $regzone = "{;.+?\'(?<zone>.+?)\/.+/(?<view>.*)\'}";
@@ -471,7 +513,7 @@ namespace sxbind {
                     }
 
                     // split comments and values
-                    $split_comment = self::mb_explode_escaped(';', $line);
+                    $split_comment =  $this->mb_explode_escaped(';', $line);
                     $line_without_comment = trim($split_comment[0]);
 
                     // everything after the first ; will be used as comment
@@ -479,7 +521,7 @@ namespace sxbind {
                     $line_comment = implode(' ', $split_comment);
                     if (!$item_continue) {
                         // detect multiline start
-                        $split_multiline = self::mb_explode_escaped('(', $line);
+                        $split_multiline =  $this->mb_explode_escaped('(', $line);
                         if (count($split_multiline) > 1) {
                             $item_continue = [
                                 'comment' => $line_comment,
@@ -497,7 +539,7 @@ namespace sxbind {
                         }
                     } else {
                         // detect multiline end
-                        $split_multiline = self::mb_explode_escaped(')', $line);
+                        $split_multiline =  $this->mb_explode_escaped(')', $line);
                         if (count($split_multiline) > 1) {
                             $item_continue['raw'] .= implode('', $split_multiline);
                             $item_continue['rowcount'] = $index - $item_continue['index'] + 1;
@@ -592,8 +634,8 @@ namespace sxbind {
                             $record['name_part2'] = ".{$zone}";
                         }
 
-                        $record['_id'] = self::get_record_id($record);
-                        self::expand_zone_record($record);
+                        $record['_id'] =  $this->get_record_id($record);
+                         $this->expand_zone_record($record);
 
                         // remember name if next record has no name
                         $last_name = $record['name'];
@@ -605,7 +647,7 @@ namespace sxbind {
             return $zone_data_parsed;
         }
 
-        public static function get_record_id($object)
+        public   function get_record_id($object)
         {
             if (empty($object['_id'])) {
                 return md5($object['name'] . '/' . $object['type'] . '/' . $object['rdata']);
@@ -614,7 +656,7 @@ namespace sxbind {
             }
         }
 
-        public static function record_exists_by_name($entries, $name, $types = ['A', 'AAAA', 'PTR'])
+        public   function record_exists_by_name($entries, $name, $types = ['A', 'AAAA', 'PTR'])
         {
             foreach ($entries as $entry) { 
                 if (trim($entry['name'], '.') == trim($name, '.') && in_array($entry['type'], $types)) {
@@ -694,14 +736,14 @@ namespace sxbind {
         }
 
         // expand rdata to individual fields
-        public static function expand_zone_record(&$record)
+        public   function expand_zone_record(&$record)
         {
             // parse rdata
             $val = preg_split("/[\s,]*\\\"([^\\\"]+)\\\"[\s,]*|" .
                 "[\s,]*'([^']+)'[\s,]*|" .
                 "[\s,]+/", $record['rdata'], 0, PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE);
 
-            $record['_required'] = self::REQUIRED_FIELDS[$record['type']];
+            $record['_required'] =  $this->REQUIRED_FIELDS[$record['type']];
             switch ($record['type']) {
                 case 'MX':
                     if (count($val) == 2) {
@@ -743,7 +785,7 @@ namespace sxbind {
 
                 case 'PTR':
                     if (count($val) == 1) {
-                        $record['ip'] = self::ptr_to_ip($record['name']);
+                        $record['ip'] =  $this->ptr_to_ip($record['name']);
                         $record['host'] = $val[0];
                         $record['_expanded'] = true;
                     } else {
@@ -756,7 +798,7 @@ namespace sxbind {
                 case 'AAAA':
                     if (count($val) == 1) {
                         $record['ip'] = $val[0];
-                        $record['ptr'] = self::ip_to_ptr($record['ip']);
+                        $record['ptr'] =  $this->ip_to_ptr($record['ip']);
                         $record['_expanded'] = true;
                     } else {
                         $record['ip'] = '';
@@ -766,7 +808,7 @@ namespace sxbind {
 
                 case 'TXT':
                 case 'SPF':
-                    $record['txt'] = self::unescape_dns_string(implode('', self::mb_explode_escaped('"', $record['rdata'])));
+                    $record['txt'] =  $this->unescape_dns_string(implode('',  $this->mb_explode_escaped('"', $record['rdata'])));
                     $record['_expanded'] = true;
                     break;
 
@@ -808,7 +850,7 @@ namespace sxbind {
         }
 
         // merge individual values to rdata
-        public static function collapse_zone_record(&$record)
+        public   function collapse_zone_record(&$record)
         {
             switch ($record['type']) {
                 case 'MX':
@@ -835,7 +877,7 @@ namespace sxbind {
                 case 'TXT':
                 case 'SPF':
                     // escape string and split by 127 chars... aprox 255 byte.
-                    $str = mb_str_split(self::escape_dns_string($record['txt']), 127, 'UTF-8');
+                    $str = mb_str_split( $this->escape_dns_string($record['txt']), 127, 'UTF-8');
                     $record['rdata'] = implode('" "', array_filter($str, 'strlen'));
                     break;
 
@@ -861,14 +903,14 @@ namespace sxbind {
          * @param string $zonename The full zonename.
          * @return array|null
          */
-        public static function get_zone_dump_parsed($zonetype, $zoneview, $zonename)
+        public   function get_zone_dump_parsed($zonetype, $zoneview, $zonename)
         {
-            $rndc = self::CMD_RNDC;
+            $rndc =  $this->CMD_RNDC;
             $zonename = rtrim($zonename, '.');
-            $zonename_reverse = self::re_reverse_zonename($zonename);
+            $zonename_reverse =  $this->re_reverse_zonename($zonename);
 
             $temp_zone_file = tempnam('/tmp', "{$zonetype}_{$zoneview}_{$zonename_reverse}");
-            $zonefile = CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename_reverse}.DB";
+            $zonefile = $this->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename_reverse}.DB";
             $current_zone_data_parsed = null;
 
             // Make sure the zone file is recent.
@@ -876,13 +918,13 @@ namespace sxbind {
             //exec("{$rndc} sync -clean " . escapeshellarg($zonename) . " IN " . escapeshellarg($zoneview));
 
             // TODO: Check if there is a better way to detect if zone is raw or text.
-            exec(self::$PATH_COMPILEZONE . ' -j -f text -F text -i none -s full ' .
+            exec( $this->PATH_COMPILEZONE . ' -j -f text -F text -i none -s full ' .
                 ' -o ' . escapeshellarg($temp_zone_file) . ' ' .
                 escapeshellarg($zonename) . ' ' .
                 escapeshellarg($zonefile) . ' 2>&1', $output, $resultCode);
 
             if ($resultCode != 0) {
-                exec(self::$PATH_COMPILEZONE . ' -j -f raw -F text -i none -k ignore -m ignore -M ignore -S ignore -W ignore -s full ' .
+                exec( $this->PATH_COMPILEZONE . ' -j -f raw -F text -i none -k ignore -m ignore -M ignore -S ignore -W ignore -s full ' .
                     ' -o ' . escapeshellarg($temp_zone_file) . ' ' .
                     escapeshellarg($zonename) . ' ' .
                     escapeshellarg($zonefile) . ' 2>&1', $output, $resultCode);
@@ -890,7 +932,7 @@ namespace sxbind {
 
             if ($resultCode == 0) {
                 $current_zone_data = file_get_contents($temp_zone_file);
-                $current_zone_data_parsed = self::parse_rndc_zone_dump($current_zone_data, $zonename_reverse);
+                $current_zone_data_parsed =  $this->parse_rndc_zone_dump($current_zone_data, $zonename_reverse);
                 unlink($temp_zone_file);
             } else {
                 $error = "[bind] READ FAILED - Zone {$zonename_reverse} has lost dynamic entries.\n" . implode("\n", $output);
@@ -1025,7 +1067,7 @@ namespace sxbind {
          * @param string $new_zoneserial New Serial to set
          * @return string The new zone DB as string.
          */
-        public static function set_serial_zoneconf($zone_conf, $new_zoneserial)
+        public   function set_serial_zoneconf($zone_conf, $new_zoneserial)
         {
             // write new serial to zone_conf.
             $zone_conf_new = '';
@@ -1072,7 +1114,7 @@ namespace sxbind {
         /**
          * Reads the Zones from the config and returns a sorted list.
          */
-        public static function get_zonelist()
+        public   function get_zonelist()
         {
             $bindzone = config_get_path('installedpackages/sxbindzone/config',[]);
             $col = array_column($bindzone, 'name');
@@ -1085,13 +1127,13 @@ namespace sxbind {
          * '_iscustomrecord' will be set to true for all records found in custom zone file. Otherwise '_iscustomrecord' is false or undefined.
          * @return array Returns array of zone records as it would be returned from parse_rndc_zone_dump().
          */
-        public static function get_zonerecords($include_customzonerecords = true)
+        public   function get_zonerecords($include_customzonerecords = true)
         {
             global $config;
             $ret = [];
 
-            foreach (self::get_zonelist() as $zone) {
-                $zone_name = self::reverse_zonename($zone) . '.';
+            foreach ( $this->get_zonelist() as $zone) {
+                $zone_name =  $this->reverse_zonename($zone) . '.';
                 $zone_conf = '';
 
                 foreach ($zone['row'] as $row) {
@@ -1122,7 +1164,7 @@ namespace sxbind {
                     $zone_conf .= base64_decode($zone['customzonerecords']) . "\n";
                 }
 
-                $parsed = self::parse_rndc_zone_dump($zone_conf, $zone_name, false);
+                $parsed =  $this->parse_rndc_zone_dump($zone_conf, $zone_name, false);
 
                 if ($include_customzonerecords && $zone['customzonerecords'] != "") {
                     foreach ($parsed as &$row) {
@@ -1140,7 +1182,7 @@ namespace sxbind {
          * @param array $zonedump_parsed Data from the zone dump file
          * @return array Zone list
          */
-        public static function get_all_zones_from_dump($zonedump_parsed)
+        public   function get_all_zones_from_dump($zonedump_parsed)
         {
             $result = [];
             $list = [];
@@ -1230,18 +1272,24 @@ namespace sxbind {
         }
     }
 
+class Utils{
+       public static function guidv4($data = null)
+        {
+            // Generate 16 bytes (128 bits) of random data or use the data passed into the function.
+            $data = $data ?? random_bytes(16);
+            assert(strlen($data) == 16);
 
-    if (file_exists('/usr/local/sbin/named-checkzone')) {
-        ZoneParser::$PATH_CHECKZONE = '/usr/local/sbin/named-checkzone';
-    } else {
-        ZoneParser::$PATH_CHECKZONE = '/usr/local/bin/named-checkzone';
-    }
+            // Set version to 0100
+            $data[6] = chr(ord($data[6]) & 0x0f | 0x40);
+            // Set bits 6-7 to 10
+            $data[8] = chr(ord($data[8]) & 0x3f | 0x80);
 
-    if (file_exists('/usr/local/sbin/named-compilezone')) {
-        ZoneParser::$PATH_COMPILEZONE = '/usr/local/sbin/named-compilezone';
-    } else {
-        ZoneParser::$PATH_COMPILEZONE = '/usr/local/bin/named-compilezone';
-    }
+            // Output the 36 character UUID.
+            return vsprintf('%s%s-%s-%s-%s-%s%s%s', str_split(bin2hex($data), 4));
+        }
+}
+
+
 
     class named_config
     {
@@ -1285,7 +1333,7 @@ namespace sxbind {
                         }
                         if ($subdepth == 0 && $blockend > $blockstart){
                             $inner_block = array_slice($wordlist, $blockstart, $blockend - $blockstart);
-                          $data['child'] = self::processSubBlock($inner_block);
+                          $data['child'] =  $this->processSubBlock($inner_block);
                           $idx = $blockend +1;
                         }else{
                             // Oh Oh, that should not happen! Maybe } missing.
@@ -1312,16 +1360,16 @@ namespace sxbind {
         public function from_string($txt)
         {
             // remove comments
-            $txt = preg_replace(self::REGEX_COMMENT, '', $txt);
+            $txt = preg_replace( $this->REGEX_COMMENT, '', $txt);
 
             // Split into words
-            preg_match(self::REGEX_WORDS, $txt, $matches);
+            preg_match( $this->REGEX_WORDS, $txt, $matches);
             $wordlist = [];
             foreach ($matches as $word){
                 $wordlist[] = $word[0];
             }
 
-            self::$config = self::processSubBlock($wordlist);
+            $this->config =  $this->processSubBlock($wordlist);
         }
 
         private function to_string_recursive($data){
@@ -1334,14 +1382,14 @@ namespace sxbind {
             $str .= ';\n';
 
             foreach ($data['child'] as $child){
-                $str .= '{' . self::to_string_recursive($child) . " };\n";
+                $str .= '{' . $this->to_string_recursive($child) . " };\n";
             }
            
             return $str;
         }
 
         public function to_string(){
-          $str =  self::to_string_recursive(self::$config);
+          $str =  $this->to_string_recursive( $this->$config);
             return $str;
         }
     }

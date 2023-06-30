@@ -8,7 +8,7 @@ require_once("guiconfig.inc");
 require_once("config.inc");
 require_once("/usr/local/pkg/sxbind_zoneparser.inc");
 require_once("/usr/local/pkg/sxbind.inc");
-
+$ZoneParser = ZoneParser::get_instance();
 /**
  * Converts all special characters to html entities and adds <wbr>-tag as suffix to any point (.) to enable better line break in long host names.
  * @param string $string The input string.
@@ -61,9 +61,9 @@ if ($_POST) {
     if ($post["action"] == "download_zonefile") {
         if ($zonename) {
             if ($zonename == 'all') {
-                $zonedb = ZoneParser::get_rndc_zone_dump();
+                $zonedb = $ZoneParser->get_rndc_zone_dump();
             } else {
-                $zonedb = ZoneParser::compilezone($zoneview, $zonename_reverse);
+                $zonedb = $ZoneParser->compilezone($zoneview, $zonename_reverse);
             }
 
             if ($zonedb === false) {
@@ -87,7 +87,7 @@ if ($_POST) {
 
     if ($post["action"] == 'save') {
         if ($zoneview) {
-            $result = ZoneParser::save_zonefile($post['zone_data'], $zonetype, $zoneview, $zonename_reverse);
+            $result = $ZoneParser->save_zonefile($post['zone_data'], $zonetype, $zoneview, $zonename_reverse);
 
             if ($result['success']) {
                 $thaw = true;
@@ -122,7 +122,7 @@ if ($_POST) {
 
     if ($post["action"] == 'thaw' || $thaw == true) {
         if ($zoneview) {
-            $ret = ZoneParser::thaw_zone($zoneview, $zonename_reverse);
+            $ret = $ZoneParser->thaw_zone($zoneview, $zonename_reverse);
             if ($ret['success']) {
                 $post['zone_editable'] = "false";
                 $savemsg[] = "Thaw successfull";
@@ -135,7 +135,7 @@ if ($_POST) {
     }
 
     if ($post["action"] == 'thawall') {
-        $ret = ZoneParser::thaw_all();
+        $ret = $ZoneParser->thaw_all();
         if ($ret['success']) {
             $post['zone_editable'] = "false";
             $savemsg[] = "End-Edit (Thaw All) successfull.";
@@ -148,7 +148,7 @@ if ($_POST) {
 
     if ($post["action"] == 'freeze') {
         if ($zoneview) {
-            $ret = ZoneParser::freeze_zone($zoneview, $zonename_reverse);
+            $ret = $ZoneParser->freeze_zone($zoneview, $zonename_reverse);
 
             if ($ret['success']) {
                 $loadZone = true;
@@ -166,13 +166,13 @@ if ($_POST) {
     if ($loadZone === true) {
         try {
             if ($zonename == "all") {
-                $post['zone_data'] = ZoneParser::get_rndc_zone_dump();
+                $post['zone_data'] = $ZoneParser->get_rndc_zone_dump();
                 $post['zone_editable'] = "false";
             } else {
-                $post['zone_data'] = ZoneParser::compilezone($zoneview, $zonename_reverse);
+                $post['zone_data'] = $ZoneParser->compilezone($zoneview, $zonename_reverse);
                 $savemsg[] = "Zonedata loaded from DB.";
             }
-            $post['zone_parsed'] = ZoneParser::parse_rndc_zone_dump($post['zone_data'], $zonename_reverse, false);
+            $post['zone_parsed'] = $ZoneParser->parse_rndc_zone_dump($post['zone_data'], $zonename_reverse, false);
         } catch (Exception $e) {
             $post['zone_data'] = '';
             $post['zone_editable'] = "false";
@@ -193,12 +193,12 @@ $zonelist = [];
 $zonelist_not_master = [];
 $zone_backup = 'No Backup found.';
 
-foreach (ZoneParser::get_zonelist() as $zone) {
-    $zonekey = $zone['view'] . '__' . $zone['name'] . '__' . ZoneParser::reverse_zonename($zone) . '__' . $zone['type'];
+foreach ($ZoneParser->get_zonelist() as $zone) {
+    $zonekey = $zone['view'] . '__' . $zone['name'] . '__' . $ZoneParser->reverse_zonename($zone) . '__' . $zone['type'];
     if ($zone['type'] == 'master') {
-        $zonelist[$zonekey] = ZoneParser::reverse_zonename($zone) . '  (' . $zone['view'] . ')';
+        $zonelist[$zonekey] = $ZoneParser->reverse_zonename($zone) . '  (' . $zone['view'] . ')';
     } else {
-        $zonelist_not_master[$zonekey] = ZoneParser::reverse_zonename($zone) . '  (' . $zone['view'] . ')';
+        $zonelist_not_master[$zonekey] = $ZoneParser->reverse_zonename($zone) . '  (' . $zone['view'] . ')';
     }
 
     if ($zonekey == $post['current_zone'] && $zone['backup']){
@@ -368,7 +368,7 @@ if (!empty($savemsg)) {
                                         <td>
                                             <select data-fieldname="type">
                                                 <option value="">[Select a Type]</option>
-                                                <? foreach (ZoneParser::RECORDTYPES as $type) {
+                                                <? foreach ($ZoneParser->RECORDTYPES as $type) {
                                                     print('<option value="' . $type . '">' . $type . '</option>');
                                                 } ?>
                                             </select>
@@ -506,7 +506,7 @@ if (!empty($savemsg)) {
                                                             case 'ptr':
                                                             case 'mname':
                                                             case 'nameserver':
-                                                                if (ZoneParser::record_exists_by_name($post['zone_parsed'], $val)) {
+                                                                if ($ZoneParser->record_exists_by_name($post['zone_parsed'], $val)) {
                                                                     $icon = '<i class="fa fa-check"></i>';
                                                                 }
                                                             default:
@@ -589,7 +589,7 @@ include('foot.inc');
 ?>
 <script type="text/javascript">
     var recordtypeFieldlist = {
-        <? foreach (ZoneParser::REQUIRED_FIELDS as $key => $value) {
+        <? foreach ($ZoneParser->REQUIRED_FIELDS as $key => $value) {
             print('"' . $key . '": [');
             foreach ($value as $val) {
                 print('"' . $val . '",');

@@ -33,8 +33,6 @@ if (!function_exists("filter_configure")) {
 require_once("notices.inc");
 require_once("xmlrpc_client.inc");
 
-define('BIND_LOCALBASE', '/usr/local');
-define('CHROOT_LOCALBASE', '/var/etc/named');
 
 function sxbind_zone_validate(&$post, &$input_errors)
 {
@@ -126,13 +124,16 @@ function sxbind_display_top_tabs()
 	if ($active == 'pkg_edit.php') {
 		$active = $_REQUEST['xml'];
 	}
+
 	$tab_array = array();
 	$tab_array[] = array(gettext("Settings"), (($active == 'sxbind.xml') ? true : false), "/pkg_edit.php?xml=sxbind.xml");
 	$tab_array[] = array(gettext("ACLs"), (($active == 'sxbind_acls.xml') ? true : false), "/pkg_edit.php?xml=sxbind_acls.xml");
 	$tab_array[] = array(gettext("Views"), (($active == 'sxbind_views.xml') ? true : false), "/pkg_edit.php?xml=sxbind_views.xml");
-	$tab_array[] = array(gettext("Zones"), (($active == 'sxbind_zones.xml') ? true : false), "/pkg_edit.php?xml=sxbind_zones.xml");
 	$tab_array[] = array(gettext("TSIG-Keys"), (($active == 'sxbind_keys.php') ? true : false), "/sxbind_keys.php");
-	$tab_array[] = array(gettext("Edit Zone DB"), (($active == 'sxbind_zone_edit.php') ? true : false), "/sxbind_zone_edit.php");
+	$tab_array[] = array(gettext("Zones"), (($active == 'sxbind_zones.xml') ? true : false), "/pkg_edit.php?xml=sxbind_zones.xml");
+	$tab_array[] = array(gettext("Zone Config"), (($active == 'sxbind_zone_config.php') ? true : false), "/sxbind_zone_config.php");
+	$tab_array[] = array(gettext("Zone DB Editor"), (($active == 'sxbind_zone_edit.php') ? true : false), "/sxbind_zone_edit.php");
+	
 	$tab_array[] = array(gettext("Sync"), (($active == 'sxbind_sync.xml') ? true : false), "/pkg_edit.php?xml=sxbind_sync.xml");
 	display_top_tabs($tab_array);
 }
@@ -156,7 +157,7 @@ function sxbind_set_serial_zoneconf($zone_conf, $new_zoneserial)
 	}
 	return $zone_conf;
 }
-function file_put_contents_if_changed($file, $content, &$changed)
+function file_put_contents_if_changed($file, $content, &$changed = false)
 {
 	if (!file_exists($file) || file_get_contents($file) != $content) {
 		file_put_contents($file, $content);
@@ -404,7 +405,7 @@ function sxbind_get_key($str, $key_name)
 function sxbind_get_keys($str)
 {
 	if ($str == null) {
-		$str = file_get_contents(CHROOT_LOCALBASE . '/etc/namedb/named.conf');
+		$str = file_get_contents(ZoneParser::get_instance()->CHROOT_LOCALBASE . '/etc/namedb/named.conf');
 	}
 	$re = '/^\s*key \"(.*)\" \{[\s\S]*?\}\s*?;?/m';
 	preg_match_all($re, $str, $matches);
@@ -436,8 +437,10 @@ function sxbind_remove_key($str, $key_name, &$changed)
 function sxbind_create_rndc_conf_file($force = false, &$new_rndc_key = null)
 {
 	global $config;
-	$bind = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bind']['config'][0];
-	$rndc_file = BIND_LOCALBASE . '/etc/rndc.conf';
+	$ZoneParser = new ZoneParser();
+	
+	$bind = $config['installedpackages']['sxbind']['config'][0];
+	$rndc_file = $ZoneParser->LOCALBASE . '/etc/rndc.conf';
 	$rndc_port = $bind['controlport'] == "" ? "8953" : $bind['controlport'];
 
 	if (file_exists($rndc_file) && $force == false) {
@@ -451,7 +454,7 @@ function sxbind_create_rndc_conf_file($force = false, &$new_rndc_key = null)
 			if (!$new_rndc_key) {
 				$error = "[sxbind] INFO - rndc-key will be created because it is missing.";
 				log_error($error);
-				$new_rndc_key = ZoneParser::create_tsig_key('rndc-key');
+				$new_rndc_key = $ZoneParser->get_instance()->create_tsig_key('rndc-key');
 				$rndc_conf = sxbind_change_or_add_key($rndc_conf, $new_rndc_key, $changed);
 			}
 		}
@@ -465,7 +468,7 @@ function sxbind_create_rndc_conf_file($force = false, &$new_rndc_key = null)
 		$changed = true;
 
 		if ($new_rndc_key == null) {
-			$new_rndc_key = ZoneParser::create_tsig_key('rndc-key');
+			$new_rndc_key = $ZoneParser->get_instance()->create_tsig_key('rndc-key');
 		}
 
 		$param = [
@@ -480,8 +483,8 @@ function sxbind_create_rndc_conf_file($force = false, &$new_rndc_key = null)
 
 	if ($rndc_conf) {
 		file_put_contents_if_changed($rndc_file, $rndc_conf, $changed);
-		file_put_contents_if_changed(CHROOT_LOCALBASE . '/etc/namedb/rndc.conf', $rndc_conf, $changed);
-		@symlink($rndc_file, BIND_LOCALBASE . "/etc/namedb/rndc.conf");
+		file_put_contents_if_changed($ZoneParser->CHROOT_LOCALBASE . '/etc/namedb/rndc.conf', $rndc_conf, $changed);
+		@symlink($rndc_file, $ZoneParser->LOCALBASE . "/etc/namedb/rndc.conf");
 	} else {
 		$error = "[sxbind] ERROR - rndc.conf could not be created.";
 		log_error($error);
@@ -578,13 +581,13 @@ EOD;
 
 	// Add ACLS to config
 	if (!is_array($config['installedpackages']['sxbindacls']) || !is_array($config['installedpackages']['sxbindacls']['config'])) {
-		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
+		$config['installedpackages']['sxbindacls']['config'][] =
 			array("name" => "none", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
+		$config['installedpackages']['sxbindacls']['config'][] =
 			array("name" => "any", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
+		$config['installedpackages']['sxbindacls']['config'][] =
 			array("name" => "localhost", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
-		$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindacls']['config'][] =
+		$config['installedpackages']['sxbindacls']['config'][] =
 			array("name" => "localnets", "description" => "BIND Built-in ACL", "row" => array("value" => "", "description" => ""));
 		write_config("Created BIND Built-in ACLs");
 	}
@@ -662,6 +665,7 @@ function sxbind_get_bind_conf_views($bindview, $bindzone)
 {
 	global $config;
 	$ret = '';
+	$ZoneParser = new ZoneParser();
 
 	for ($i = 0; $i < sizeof($bindview); $i++) {
 		$views = $config['installedpackages']['sxbindviews']['config'][$i];
@@ -731,7 +735,7 @@ function sxbind_get_bind_conf_views($bindview, $bindzone)
 			// Ensure zone view folder exists
 			if ($zonetype != "forward") {
 				foreach ($zoneviewlist as $zoneview) {
-					safe_mkdir(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}", 0755);
+					safe_mkdir($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}", 0755);
 				}
 			}
 
@@ -836,7 +840,7 @@ function sxbind_creaete_named_conf($rndc_key)
 	global $config;
 
 	//create named.conf string
-	$bind = config_get_path('installedpackages/sxbind/config/0'); #$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bind']['config'][0];
+	$bind = config_get_path('installedpackages/sxbind/config/0');
 	$bind_conf = sxbind_get_bind_conf_from_template($bind, $rndc_key);
 
 	return $bind_conf;
@@ -852,15 +856,31 @@ function sxbind_tryRestoreZoneDB($zone, $zonefile, &$config_changed)
 				$config_changed = true;
 				return $zonestring;
 			}
+		}else{
+			$bckupdir = '/usr/local/backup/sxbind/';
+			$filename = $bckupdir . '_zone_' . str_replace('.', '_', $zone['name']) . '.txt';
+			if (file_exists($filename)){
+				$zonestring = file_get_contents($filename);
+				file_put_contents($zonefile, $zonestring);
+				log_error('[sxbind] INFO - Zonefile for zone ' . $zone['name'] . ' restored from file backup');
+				$config_changed = true;
+				return $zonestring;
+			}
 		}
 
 		log_error('[sxbind] WARNING - No Backup for zone ' . $zone['name'] . ' found.');
 		return null;
 	}
-}
-function sxbind_sync($is_remote_sync = false, $zone_only = false)
+}function sxbind_sync($is_remote_sync = false, $zone_only = false)
 {
 	global $config;
+	global $g;
+
+	mkdir('/usr/local/backup/sxbind/', null, true);
+	if (!array_key_exists('sxbind',$g['backuppath'])){
+		$g['backuppath'][] = ['sxbind' => '/usr/local/backup/sxbind/*.*'];
+	}
+
 	if ($_POST['name']) {
 		$zone_only = $_POST['name'];
 	}
@@ -868,10 +888,13 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 		log_error('[sxbind] INFO - Apply settings for Zone ' . $zone_only);
 	}
 
+	$ZoneParser = new ZoneParser();
+
 	$config_changed = false;
 	$named_process = "named";
 	$bind_enable = config_get_path('installedpackages/sxbind/config/0/enable_bind', "off") == "on"; # $bind['enable_bind'];
 	$write_config = 0;
+	
 
 	if (!$bind_enable) {
 		goto skip_config;
@@ -903,7 +926,7 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 
 	// write named.conf
 	$bind_conf = sxbind_creaete_named_conf($rndc_key);
-	file_put_contents_if_changed(CHROOT_LOCALBASE . '/etc/namedb/named.conf', $bind_conf, $config_changed);
+	file_put_contents_if_changed($ZoneParser->CHROOT_LOCALBASE . '/etc/namedb/named.conf', $bind_conf, $config_changed);
 
 	// Create Zones
 	$bindview = config_get_path('installedpackages/sxbindviews/config', []);
@@ -935,7 +958,7 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 			// Ensure zone view folder exists
 			if ($zonetype != "forward") {
 				foreach ($zoneviewlist as $zoneview) {
-					safe_mkdir(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}", 0755);
+					safe_mkdir($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}", 0755);
 				}
 			}
 
@@ -952,8 +975,8 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 					case 'master':
 					case 'redirect':
 						// Check/update slave dir permission
-						chown(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}", "bind");
-						chown(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}", "bind");
+						chown($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}", "bind");
+						chown($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}", "bind");
 
 						$zonetll = $zone['tll'] ? $zone['tll'] : "43200";
 						$zonemail = $zone['mail'] ? $zone['mail'] : "zonemaster.{$zonename}";
@@ -1042,10 +1065,10 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 						// Detect Zone changes
 						$skipZoneUpdate = false;
 						$diff = [];
-						$zone_cache_file = CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.confcache";
+						$zone_cache_file = $ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.confcache";
 						$zonename_reverse = reverse_zonename($zonename, $zonereverso, $zonereversv6o);
-						$rndc = "/usr/local/sbin/rndc -q -r -c " . BIND_LOCALBASE . "/etc/rndc.conf";
-						$zonefile = CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB";
+						$rndc = "/usr/local/sbin/rndc -q -r -c " . $ZoneParser->LOCALBASE . "/etc/rndc.conf";
+						$zonefile = $ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB";
 
 						// Try to restore missing Zonefile from Backup.
 						$tryRestore = false;
@@ -1056,15 +1079,15 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 						// read new and last zonedata to build diff
 						if (file_exists($zone_cache_file)) {
 							$zoneCacheString = file_get_contents($zone_cache_file);
-							$zoneRows_cached_config = ZoneParser::parse_rndc_zone_dump($zoneCacheString, $zonename_reverse);
+							$zoneRows_cached_config = $ZoneParser->parse_rndc_zone_dump($zoneCacheString, $zonename_reverse);
 						} else {
 							$zoneRows_cached_config = [];
 						}
 
 						// new records
-						$zoneRows_new_config = ZoneParser::parse_rndc_zone_dump($zone_conf, $zonename_reverse);
+						$zoneRows_new_config = $ZoneParser->parse_rndc_zone_dump($zone_conf, $zonename_reverse);
 						// removed records
-						$diff = ZoneParser::diff_zonerecords($zoneRows_cached_config, $zoneRows_new_config);
+						$diff = $ZoneParser->diff_zonerecords($zoneRows_cached_config, $zoneRows_new_config);
 						// all records which should not be in the dynamic section
 						$diff = array_merge($zoneRows_new_config, $diff);
 						if ($zoneCacheString == $zone_conf) {
@@ -1081,7 +1104,7 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 
 							// Freeze dynamic zones to prevent journal corruption.
 							if ($process_running && file_exists($zonefile)) {
-								ZoneParser::freeze_zone($zoneview, $zonename_reverse);
+								$ZoneParser->freeze_zone($zoneview, $zonename_reverse);
 							}
 
 							if (file_exists($zonefile)) {
@@ -1097,13 +1120,13 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 							} elseif ($tryRestore) {
 								$restoredZoneString = sxbind_tryRestoreZoneDB($zone, $zonefile, $config_changed);
 								if ($restoredZoneString) {
-									$current_zone_data_parsed = ZoneParser::parse_rndc_zone_dump($restoredZoneString, $zonename_reverse);
+									$current_zone_data_parsed = $ZoneParser->parse_rndc_zone_dump($restoredZoneString, $zonename_reverse);
 								}
 							}
 
 							// read current zone data
-							if (!$current_zone_data_parsed || file_exists($zonefile)) {
-								$current_zone_data_parsed = ZoneParser::get_zone_dump_parsed($zonetype, $zoneview, $zonename_reverse);
+							if (!$current_zone_data_parsed && file_exists($zonefile)) {
+								$current_zone_data_parsed = $ZoneParser->get_zone_dump_parsed($zonetype, $zoneview, $zonename_reverse);
 								if (!$current_zone_data_parsed) {
 									$error = "[sxbind] ERROR: Failed to parse current zone data of zone {$zonename_reverse} .To prevent loose , the Zone remains in the old state. Manual resolve any errors in zone file or performe a reset on the zone from the zone config to fix this issue.\n\n";
 									file_notice("named_config", $error, "sxbind DNS", "", 2);
@@ -1115,41 +1138,24 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 
 							// compare and merge zone data by adding existing records in db to zone_conf_dynamic
 							if ($current_zone_data_parsed) {
-								$zonedata_to_merge = ZoneParser::diff_zonerecords($current_zone_data_parsed, $diff);
+								$zonedata_to_merge = $ZoneParser->diff_zonerecords($current_zone_data_parsed, $diff);
 								$zone_conf_dynamic = "\n;\n; Merged Dynamic Zone Records\n;\n";
 								foreach ($zonedata_to_merge as $row) {
 									if ($row['type'] !== 'SOA') {
 										// Add all records except SOA as this is already added to zone_conf.
-										$zone_conf_dynamic .= ZoneParser::zone_record_to_string($row) . "\n";
+										$zone_conf_dynamic .= $ZoneParser->zone_record_to_string($row) . "\n";
 									}
 								}
 								log_error('[sxbind] INFO: ZONE ' . $zonename_reverse . ' : ' . count($current_zone_data_parsed) . ' Records in DB. ' . count($zonedata_to_merge) . ' Records to keep from DB. ' . count($zoneRows_new_config) . ' Records to add from Config.');
 							}
 
-							//Increment serial 
-							if ($zone['increment_serial'] == "on") {
-								$current_zoneserial = null;
-								// get current serial from zone db
-								if ($current_zone_data_parsed) {
-									foreach ($current_zone_data_parsed as $row) {
-										if ($row["type"] == 'SOA') {
-											$current_zoneserial = $row['serial'];
-											break;
-										}
-									}
-								}
-								if ($current_zoneserial) {
-									$zone_conf = sxbind_set_serial_zoneconf($zone_conf, $current_zoneserial + 1);
-								}
-							}
-
 							// validate and save to DB if successfull.
-							$result = ZoneParser::save_zonefile($zone_conf . $zone_conf_dynamic, $zonetype, $zoneview, $zonename_reverse);
+							$result = $ZoneParser->save_zonefile($zone_conf . $zone_conf_dynamic, $zonetype, $zoneview, $zonename_reverse);
 
 							if ($result['success']) {
 								/* Validation successfull
-																				Save zone_conf to cache file for comparison on next update. 
-																				Do not store in config to prevent replication or backup.
+								Save zone_conf to cache file for comparison on next update. 
+								Do not store in config to prevent replication or backup.
 																				*/
 								file_put_contents($zone_cache_file, $zone_conf_orig);
 								$data = base64_encode($zone_conf . $zone_conf_dynamic);
@@ -1167,7 +1173,7 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 
 							if ($process_running) {
 								// Thaw frozen zone
-								$result = ZoneParser::thaw_zone($zoneview, $zonename_reverse);
+								$result = $ZoneParser->thaw_zone($zoneview, $zonename_reverse);
 								if (!$result['success']) {
 									$error = "[sxbind] WARNING: RNDC THAW throwed an exception. Zone {$zonename_reverse} may still be frozen. Code {$result['result_code']}\n" . $result['message'];
 									log_error($error);
@@ -1183,12 +1189,12 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 							/* move DNSSEC keys from old chroot,
 							 * see https://redmine.pfsense.org/issues/13002 */
 							foreach (glob("/var/etc/named/etc/namedb/keys/K{$zonename}*key", GLOB_NOSORT) as $filename) {
-								$newkey = CHROOT_LOCALBASE . "/etc/namedb/keys/" . basename($filename);
+								$newkey = $ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/keys/" . basename($filename);
 								if (!file_exists($newkey)) {
 									rename($filename, $newkey);
 								}
 							}
-							foreach (glob(CHROOT_LOCALBASE . "/etc/namedb/keys/K{$zonename}*key", GLOB_NOSORT) as $filename) {
+							foreach (glob($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/keys/K{$zonename}*key", GLOB_NOSORT) as $filename) {
 								$zone_found++;
 							}
 							if ($zone_found == 0) {
@@ -1210,25 +1216,25 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 								$dnssec_bin = "/usr/local/sbin/dnssec-keygen";
 								$z = reverse_zonename($zonename, $zonereverso, $zonereversv6o);
 								if (file_exists($dnssec_bin) && $key_restored == 0) {
-									exec("{$dnssec_bin} -a ECDSAP256SHA256 -K " . CHROOT_LOCALBASE . "/etc/namedb/keys {$z}", $kout);
-									exec("{$dnssec_bin} -a ECDSAP256SHA256 -K " . CHROOT_LOCALBASE . "/etc/namedb/keys -fk {$z}", $kout);
+									exec("{$dnssec_bin} -a ECDSAP256SHA256 -K " . $ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/keys {$z}", $kout);
+									exec("{$dnssec_bin} -a ECDSAP256SHA256 -K " . $ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/keys -fk {$z}", $kout);
 									foreach ($kout as $filename) {
-										chown(CHROOT_LOCALBASE . "/etc/namedb/keys/{$filename}.key", "bind");
-										chown(CHROOT_LOCALBASE . "/etc/namedb/keys/{$filename}.private", "bind");
+										chown($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/keys/{$filename}.key", "bind");
+										chown($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/keys/{$filename}.private", "bind");
 									}
 									log_error("[sxbind] DNSSEC CREATED: DNSSEC keys for {$zonename} created.");
 								}
 							}
 							// Get DS keys
 							$dsfromkey = "/usr/local/sbin/dnssec-dsfromkey";
-							foreach (glob(CHROOT_LOCALBASE . "/etc/namedb/keys/K{$zonename}*key", GLOB_NOSORT) as $filename) {
+							foreach (glob($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/keys/K{$zonename}*key", GLOB_NOSORT) as $filename) {
 								$zone_key = file_get_contents($filename);
 								if (preg_match("/IN DNSKEY 257 /", $zone_key) && file_exists($dsfromkey)) {
 									exec("$dsfromkey $filename", $dsset);
 
 									$data = base64_encode(array_pop($dsset) . "\n" . array_pop($dsset));
-									if ($config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x]['dsset'] != $data) {
-										$config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bindzone']['config'][$x]['dsset'] = $data;
+									if ($config['installedpackages']['sxbindzone']['config'][$x]['dsset'] != $data) {
+										$config['installedpackages']['sxbindzone']['config'][$x]['dsset'] = $data;
 										$write_config++;
 									}
 								}
@@ -1237,7 +1243,7 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 							// Save DNSSEC keys to xml
 							if ($zone['backupkeys'] == "on") {
 								$dnssec_keys = 0;
-								foreach (glob(CHROOT_LOCALBASE . "/etc/namedb/keys/K{$zonename}*", GLOB_NOSORT) as $filename) {
+								foreach (glob($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/keys/K{$zonename}*", GLOB_NOSORT) as $filename) {
 									$file_found = 0;
 									if (is_array($config['installedpackages']['dnsseckeys']) && is_array($config['installedpackages']['dnsseckeys']['config'])) {
 										foreach ($config['installedpackages']['dnsseckeys']['config'] as $filer) {
@@ -1265,17 +1271,17 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 						break;
 					case 'slave':
 						// Check/update slave dir permission
-						chown(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}", "bind");
-						chown(CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}", "bind");
+						chown($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}", "bind");
+						chown($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}", "bind");
 						// check if exists slave zone file
 						$rsconfig = "";
-						$zonefile = CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB";
+						$zonefile = $ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB";
 						// Try to restore missing Zonefile from Backup.
 						sxbind_tryRestoreZoneDB($zone, $zonefile, $config_changed);
 
 						if ($zone['dnssec'] == "on") {
 							if (file_exists($zonefile . '.signed')) {
-								exec("/usr/local/sbin/named-checkzone -D -f raw -o - {$zonename} " . CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB.signed", $slave_file);
+								exec("/usr/local/sbin/named-checkzone -D -f raw -o - {$zonename} " . $ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB.signed", $slave_file);
 							}
 						} else {
 							if (file_exists($zonefile)) {
@@ -1317,10 +1323,10 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 	if (!$zone_only) {
 		$dirs = array("/etc/namedb/keys", "/var/run/named", "/var/dump", "/var/log", "/var/stats", "/dev");
 		foreach ($dirs as $dir) {
-			safe_mkdir(CHROOT_LOCALBASE . $dir, 0755);
+			safe_mkdir($ZoneParser->CHROOT_LOCALBASE . $dir, 0755);
 		}
 		// Handle /dev dirs for chroot
-		$bind_dev_dir = CHROOT_LOCALBASE . "/dev";
+		$bind_dev_dir = $ZoneParser->CHROOT_LOCALBASE . "/dev";
 		if (!file_exists("$bind_dev_dir/random")) {
 			$dev_dirs = array("null", "zero", "random", "urandom");
 			exec("/sbin/mount -t devfs devfs {$bind_dev_dir}", $dout);
@@ -1333,17 +1339,17 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 		}
 
 		// Handle /usr/local/lib/named for chroot
-		$bind_plugin_dir = CHROOT_LOCALBASE . BIND_LOCALBASE . "/lib/named";
+		$bind_plugin_dir = $ZoneParser->CHROOT_LOCALBASE . $ZoneParser->LOCALBASE . "/lib/named";
 		rmdir_recursive($bind_plugin_dir);
 		safe_mkdir($bind_plugin_dir, 0755);
 
-		foreach (glob(BIND_LOCALBASE . "/lib/named/*.so") as $bind_plugin) {
-			copy($bind_plugin, CHROOT_LOCALBASE . $bind_plugin);
+		foreach (glob($ZoneParser->LOCALBASE . "/lib/named/*.so") as $bind_plugin) {
+			copy($bind_plugin, $ZoneParser->CHROOT_LOCALBASE . $bind_plugin);
 		}
 		// http://www.unixwiz.net/techtips/bind9-chroot.html
 
 
-		if (!file_exists(CHROOT_LOCALBASE . "/etc/namedb/named.root")) {
+		if (!file_exists($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/named.root")) {
 			$curl_session = curl_init();
 			curl_setopt($curl_session, CURLOPT_URL, "http://www.internic.net/domain/named.root");
 			curl_setopt($curl_session, CURLOPT_RETURNTRANSFER, true);
@@ -1354,21 +1360,21 @@ function sxbind_sync($is_remote_sync = false, $zone_only = false)
 				$named_root = file_get_contents("/usr/local/etc/namedb/named.root");
 			}
 			curl_close($curl_session);
-			file_put_contents(CHROOT_LOCALBASE . "/etc/namedb/named.root", $named_root, LOCK_EX);
+			file_put_contents($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/named.root", $named_root, LOCK_EX);
 			$config_changed = true;
 		}
-		if (!file_exists(CHROOT_LOCALBASE . "/etc/localtime")) {
-			copy("/etc/localtime", CHROOT_LOCALBASE . "/etc/localtime");
+		if (!file_exists($ZoneParser->CHROOT_LOCALBASE . "/etc/localtime")) {
+			copy("/etc/localtime", $ZoneParser->CHROOT_LOCALBASE . "/etc/localtime");
 			$config_changed = true;
 		}
 
 		sxbind_write_rcfile();
 
-		chown(CHROOT_LOCALBASE . "/etc/namedb/keys", "bind");
-		chown(CHROOT_LOCALBASE . "/etc/namedb", "bind");
-		chown(CHROOT_LOCALBASE . "/var/log", "bind");
-		chown(CHROOT_LOCALBASE . "/var/run/named", "bind");
-		chgrp(CHROOT_LOCALBASE . "/var/log", "bind");
+		chown($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/keys", "bind");
+		chown($ZoneParser->CHROOT_LOCALBASE . "/etc/namedb", "bind");
+		chown($ZoneParser->CHROOT_LOCALBASE . "/var/log", "bind");
+		chown($ZoneParser->CHROOT_LOCALBASE . "/var/run/named", "bind");
+		chgrp($ZoneParser->CHROOT_LOCALBASE . "/var/log", "bind");
 	}
 
 	skip_config:
@@ -1413,21 +1419,23 @@ function sxbind_print_javascript_type_zone()
 function sxbind_write_rcfile()
 {
 	global $config;
-	$bind = $config['installedpackages'][ZoneParser::CONFIGPREFIX . 'bind']['config'][0];
+	$ZoneParser = ZoneParser::get_instance();
+
+	$bind = $config['installedpackages']['sxbind']['config'][0];
 	$ip_version = ($bind['bind_ip_version'] ? $bind['bind_ip_version'] : "");
 	$rc = array();
-	$BIND_LOCALBASE = "/usr/local";
+	$ZoneParser->LOCALBASE = "/usr/local";
 	$rc['file'] = 'named.sh';
 	// Curly braces in the following <<<EOD are PHP {$variable}, not named.conf text { value; }
 	$rc['start'] = <<<EOD
 	if [ -z "`/bin/ps auxw | /usr/bin/grep "[n]amed " | /usr/bin/awk '{print $2}'`" ]; then
-		{$BIND_LOCALBASE}/sbin/named {$ip_version} -c /etc/namedb/named.conf -u bind -t /var/etc/named/
+		{$ZoneParser->LOCALBASE}/sbin/named {$ip_version} -c /etc/namedb/named.conf -u bind -t /var/etc/named/
 	fi
 EOD;
 	$rc['stop'] = <<<EOD
 	if [ -n "`/bin/ps auxw | /usr/bin/grep "[n]amed " | /usr/bin/awk '{print $2}'`" ]; then
-		{$BIND_LOCALBASE}/sbin/rndc -q -r -c "{$BIND_LOCALBASE}/etc/rndc.conf" sync -clean 2>/dev/null
-		{$BIND_LOCALBASE}/sbin/rndc -q -r -c "{$BIND_LOCALBASE}/etc/rndc.conf" stop -clean 2>/dev/null
+		{$ZoneParser->LOCALBASE}/sbin/rndc -q -r -c "{$ZoneParser->LOCALBASE}/etc/rndc.conf" sync -clean 2>/dev/null
+		{$ZoneParser->LOCALBASE}/sbin/rndc -q -r -c "{$ZoneParser->LOCALBASE}/etc/rndc.conf" stop -clean 2>/dev/null
 		sleep 1
 		/usr/bin/killall -TERM named 2>/dev/null
 		sleep 2
@@ -1436,14 +1444,14 @@ EOD;
 	// curly braces in the following <<<EOD are PHP {$variable}, not named.conf text { value; }
 	$rc['restart'] = <<<EOD
 	if [ -z "`/bin/ps auxw | /usr/bin/grep "[n]amed " | /usr/bin/awk '{print $2}'`" ]; then
-		{$BIND_LOCALBASE}/sbin/named {$ip_version} -c /etc/namedb/named.conf -u bind -t /var/etc/named/
+		{$ZoneParser->LOCALBASE}/sbin/named {$ip_version} -c /etc/namedb/named.conf -u bind -t /var/etc/named/
 	else
-		{$BIND_LOCALBASE}/sbin/rndc -q -r -c "{$BIND_LOCALBASE}/etc/rndc.conf" sync -clean 2>/dev/null
-		{$BIND_LOCALBASE}/sbin/rndc -q -r -c "{$BIND_LOCALBASE}/etc/rndc.conf" stop -clean 2>/dev/null
+		{$ZoneParser->LOCALBASE}/sbin/rndc -q -r -c "{$ZoneParser->LOCALBASE}/etc/rndc.conf" sync -clean 2>/dev/null
+		{$ZoneParser->LOCALBASE}/sbin/rndc -q -r -c "{$ZoneParser->LOCALBASE}/etc/rndc.conf" stop -clean 2>/dev/null
 		sleep 1
 		/usr/bin/killall -TERM named 2>/dev/null
 		sleep 3
-		{$BIND_LOCALBASE}/sbin/named {$ip_version} -c /etc/namedb/named.conf -u bind -t /var/etc/named/
+		{$ZoneParser->LOCALBASE}/sbin/named {$ip_version} -c /etc/namedb/named.conf -u bind -t /var/etc/named/
 	fi
 EOD;
 	write_rcfile($rc);
