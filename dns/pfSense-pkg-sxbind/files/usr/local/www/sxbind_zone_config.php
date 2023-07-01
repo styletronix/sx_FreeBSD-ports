@@ -95,7 +95,12 @@ if (!empty($savemsg)) {
 ?>
 
 <form class="form-horizontal" method="post">
-    <input type="hidden" name="__csrf_magic" value="sid:8b2640ffae598fbd9e73c364f57d7a36fc9fd229,1687976567">
+    <div class="panel panel-default">
+        <div class="panel-heading">
+            <h2 class="panel-title">UNDER DEVELLOPMENT !! -  DO NOT USE RIGHT NOW ---</h2>
+        </div>
+</div>
+
     <div class="panel panel-default">
         <div class="panel-heading">
             <h2 class="panel-title">Domain Zone Configuration</h2>

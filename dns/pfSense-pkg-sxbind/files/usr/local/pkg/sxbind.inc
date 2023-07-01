@@ -835,6 +835,27 @@ function sxbind_get_bind_conf_views($bindview, $bindzone)
 	}
 	return $ret;
 }
+function sxbind_get_zonefile_path( $view, $zone,$zonetype = null){
+	$viewname = "";
+	if (is_array($view)){
+		$viewname = $view['name'];
+	}else{
+		$viewname = $view;
+	}
+	if (is_array($zone)) {
+		$zonename = $zone['name'];
+		if (!$zonetype){
+			$zonetype = $zone['type'];
+		}
+	} else {
+		$zonename = ZoneParser::re_reverse_zonename($zone);
+		if (!$zonetype){
+			throw new Exception('$zonetype is required if $zone is a string.');
+		}
+	}
+
+	return ZoneParser::get_instance()->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$viewname}/{$zonename}.DB";
+}
 function sxbind_creaete_named_conf($rndc_key)
 {
 	global $config;
@@ -1068,7 +1089,7 @@ function sxbind_tryRestoreZoneDB($zone, $zonefile, &$config_changed)
 						$zone_cache_file = $ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.confcache";
 						$zonename_reverse = reverse_zonename($zonename, $zonereverso, $zonereversv6o);
 						$rndc = "/usr/local/sbin/rndc -q -r -c " . $ZoneParser->LOCALBASE . "/etc/rndc.conf";
-						$zonefile = $ZoneParser->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$zoneview}/{$zonename}.DB";
+						$zonefile = sxbind_get_zonefile_path( $views, $zone);
 
 						// Try to restore missing Zonefile from Backup.
 						$tryRestore = false;

@@ -2,7 +2,7 @@
 
 PORTNAME=	pfSense-pkg-sxbind
 PORTVERSION=	1.2
-PORTREVISION= 18
+PORTREVISION= 20
 CATEGORIES=	dns
 MASTER_SITES=	# empty
 DISTFILES=	# empty
@@ -66,6 +66,8 @@ do-install:
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/sxbind_dump.php \
 		${STAGEDIR}${PREFIX}/www
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/sxbind_keys.php \
+		${STAGEDIR}${PREFIX}/www
+	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/sxbind_zone_config.php \
 		${STAGEDIR}${PREFIX}/www
 	${INSTALL_DATA} ${FILESDIR}${PREFIX}/www/sxbind_zone_edit.php \
 		${STAGEDIR}${PREFIX}/www

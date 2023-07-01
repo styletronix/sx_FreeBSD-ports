@@ -33,14 +33,32 @@ if ($_POST) {
         }
     }
 
-    if ($post['zoneselect'] != $post['current_zone'] || $post["action"] == 'reload') {
+    if ($post["action"] == "validate_zone") {
+        $result = $ZoneParser->validate_zone_string(htmlspecialchars_decode($post["zone_data"]), $post["zone_name"]);
+        
+        if ($result["success"]){
+            if ($result["has_warning"]){
+                http_response_code(202);
+            }else{
+                http_response_code(200);
+            }
+        } else{
+            http_response_code(406);
+        }
+        print(str_replace("\n",'<br>', $result["message"]));
+        exit;
+    }
+
+    if (($post['zoneselect'] != $post['current_zone'] && $post['zoneselect']) || $post["action"] == 'reload') {
         if ($post['zone_editable'] == "true") {
             $input_errors[] = "Zone is in Edit-Mode. End Edit-Mode before switching to another Zone.";
             $post['zoneselect'] = $post['current_zone'];
         } else {
+            if ($post['zoneselect']){
             $loadZone = true;
             $post['zone_editable'] = "false";
             $post['current_zone'] = $post['zoneselect'];
+            }
         }
     }
 
@@ -48,7 +66,7 @@ if ($_POST) {
     if (count($selectedZone) == 1) {
         $zoneview = null;
         $zonename = $selectedZone[0];
-        $zonename_reverse = null;
+        $zonename_reverse = $selectedZone[0];
         $zonetype = null;
     } else {
         $zoneview = $selectedZone[0];
@@ -56,7 +74,6 @@ if ($_POST) {
         $zonename_reverse = $selectedZone[2];
         $zonetype = $selectedZone[3];
     }
-
 
     if ($post["action"] == "download_zonefile") {
         if ($zonename) {
@@ -159,6 +176,66 @@ if ($_POST) {
             } else {
                 $input_errors[] = "RNDC Freeze throwed an exception.";
                 $input_errors[] = $ret['messsage'];
+                $input_errors[] = "The Zone Data could not be verified. To recover a broken Zone, Uee the \"Zone Recover\" button on the tab \"RAW Zone Edit\".";
+            }
+        }
+    }
+
+    if ($post["action"] == 'recover') {
+        if ($zoneview) {
+            $savemsg[] = "Checking Zone...";
+            $ret = $ZoneParser->freeze_zone($zoneview, $zonename_reverse);
+
+            if ($ret['success']) {
+                $loadZone = true;
+                $post['zone_editable'] = "true";
+
+
+
+                $savemsg[] = $ret['messsage'];
+                $ret = $ZoneParser->thaw_zone($zoneview, $zonename_reverse);
+                $savemsg[] = $ret['messsage'];
+
+                $savemsg[] = "Zone was successfully verified and should work.";
+            } else {
+                $input_errors[] = "Validation of Zone failed.";
+                $zonefile = sxbind_get_zonefile_path($zoneview, $zonename_reverse);
+                if (!file_exists($zonefile)) {
+                    $input_errors[] = "Zone file missing... Try to restore from backup....";
+                    if (sxbind_tryRestoreZoneDB($zone, $zonefile, $restored) != null) {
+                        $input_errors[] = "Zone file restored from backup.";
+                        $input_errors[] = "Validating Zone...";
+
+                        $ret = $ZoneParser->freeze_zone($zoneview, $zonename_reverse);
+                        if ($ret['success']) {
+                            $savemsg[] = "Zone was successfully recovered.";
+                            $ret = $ZoneParser->thaw_zone($zoneview, $zonename_reverse);
+                        }else{
+                            $input_errors[] = "Validation failed.";
+                            $input_errors[] = "Try to load raw file...";
+                            $post['zone_data'] = file_get_contents($zonefile);
+                            $post['zone_parsed'] =[];
+
+                            $savemsg[] = "Raw Data loaded.";
+                            $savemsg[] = "You may modify the raw zone file now to fix the loading issue. When saving, the configuration is validated. If you do not save, nothing has changed right now.";
+                            $post['zone_editable'] = "true";
+                        }
+
+                    } else {
+                        $input_errors[] = "Restore from Backup failed.";
+                        $savemsg[] = "Recovery not possible: Add new zone Data or Data from a backup in the raw zone editor or use the zone reset in zone config, to create new empty database.";
+                        $post['zone_data'] = "";
+                        $post['zone_parsed'] = [];
+                    }
+                }else{
+                    $input_errors[] = "Try to load raw file...";
+                    $post['zone_data'] = file_get_contents($zonefile);
+                    $post['zone_parsed'] = [];
+
+                    $savemsg[] = "Raw Data loaded.";
+                    $savemsg[] = "You may modify the raw zone file now to fix the loading issue. When saving, the configuration is validated. If you do not save, nothing has changed right now.";
+                    $post['zone_editable'] = "true";
+                }
             }
         }
     }
@@ -201,7 +278,7 @@ foreach ($ZoneParser->get_zonelist() as $zone) {
         $zonelist_not_master[$zonekey] = $ZoneParser->reverse_zonename($zone) . '  (' . $zone['view'] . ')';
     }
 
-    if ($zonekey == $post['current_zone'] && $zone['backup']){
+    if ($zonekey == $post['current_zone'] && $zone['backup']) {
         $zone_backup = base64_decode($zone['backup']);
     }
 }
@@ -310,7 +387,14 @@ if (!empty($savemsg)) {
                                 <i class="fa fa-download icon-embed-btn"></i>
                                 <?= gettext('Download Zone DB') ?>
                             </button>
+                            <button class="btn btn-danger" type="submit" value="recover" name="action">
+                                <i class="fa fa-download icon-embed-btn"></i>
+                                <?= gettext('Recover Zone') ?>
+                            </button>
                         </div>
+                    </div>
+                    <div class="form-group">
+                        <div id ="rawzonevalidationresult_container" class="alert alert-warning clearfix" role="alert"><button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">×</span></button><div class="pull-left"><span id='rawzonevalidationresult_content'></span></div></div>
                     </div>
                     <div class="form-group">
                         <div class="col-sm-12 ">
@@ -544,8 +628,8 @@ if (!empty($savemsg)) {
                 <div class="panel-body">
                     <div class="form-group">
                         <div class="col-sm-12 ">
-                            <textarea rows="15" class="form-control" wrap="off" readonly="readonly">
-                                <?= $zone_backup ?></textarea>
+                            <textarea rows="15" class="form-control" wrap="off" readonly="readonly"><?=$zone_backup ?>
+                        </textarea>
                         </div>
                     </div>
                 </div>
@@ -553,23 +637,22 @@ if (!empty($savemsg)) {
         </div>
     </div>
 
-    <div id="dlg_updatestatus" class="modal fade" role="dialog" aria-labelledby="dlg_updatestatus"
-            aria-hidden="true">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                            <span aria-hidden="true">×</span>
-                        </button>
-                        <h3 class="modal-title">Aktion</h3>
-                    </div>
-                    <div class="modal-body">
-                        <div class="form-group">
-                            <label for="dlg_updatestatus_text" class="col-sm-2 control-label">
-                            </label>
-                            <div class="col-sm-8">
-                                <textarea rows="10" class="row-fluid col-sm-10" name="dlg_updatestatus_text"
-                                    id="dlg_updatestatus_text" wrap="off">...Loading...</textarea>
+    <div id="dlg_updatestatus" class="modal fade" role="dialog" aria-labelledby="dlg_updatestatus" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">×</span>
+                    </button>
+                    <h3 class="modal-title">Aktion</h3>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="dlg_updatestatus_text" class="col-sm-2 control-label">
+                        </label>
+                        <div class="col-sm-8">
+                            <textarea rows="10" class="row-fluid col-sm-10" name="dlg_updatestatus_text"
+                                id="dlg_updatestatus_text" wrap="off">...Loading...</textarea>
                         </div>
                     </div>
                 </div>
@@ -597,6 +680,8 @@ include('foot.inc');
             print('],');
         } ?>
     }
+
+    var zoneName = "<?=$zonename_reverse?>"
 
     // Show active tab on reload
     if (location.hash !== '')
@@ -627,11 +712,11 @@ include('foot.inc');
         $('#dlg_updatestatus_text').text($text + '<br/><br/>Please wait for the process to complete.<br/><br/>This dialog will auto-close when the update is finished.<br/><br/>' +
             '<i class="content fa fa-spinner fa-pulse fa-lg text-center text-info"></i>')
         $('#dlg_updatestatus_text').attr('readonly', true)
-        $('#dlg_updatestatus_text').modal('show')
+        $('#dlg_updatestatus').modal('show')
     }
 
     function hideWait() {
-        $('#dlg_updatestatus_text').modal('hide')
+        $('#dlg_updatestatus').modal('hide')
     }
     function getDataFromRow($row) {
         var data = {}
@@ -718,6 +803,47 @@ include('foot.inc');
         })
     }
 
+
+    $onRawZoneChanged_timer = null;
+
+    function onRawZoneChanged() {
+        clearTimeout($onRawZoneChanged_timer)
+        $onRawZoneChanged_timer = setTimeout(validateRawZone, 1000);
+    }
+    function validateRawZone(){
+        $("#rawzonevalidationresult_container").removeClass("alert-warning alert-success").addClass("alert-info")
+        $("#rawzonevalidationresult_content").text("Zone validating....");
+
+        $.ajax({
+            type: 'post',
+            data: {
+                action: "validate_zone",
+                zone_data: $("#zone_data").val(),
+                zone_name: zoneName
+            },
+            statusCode: {
+                200: function(data) {
+                        if(window.console) console.log(data)
+                    },
+                202: function(data) {
+                        if(window.console) console.log(data)
+                    },
+                406: function(xhr) {
+                        if(window.console) console.log(xhr.responseText)
+                    }
+            },
+            success: function (data) {
+                $("#rawzonevalidationresult_container").removeClass("alert-warning alert-info").addClass("alert-success")
+                $("#rawzonevalidationresult_content").html(data)
+            },
+            error: function (xhr, status, error) {
+                // var err = eval("(" + xhr.responseText + ")")
+                $("#rawzonevalidationresult_container").removeClass("alert-success alert-info").addClass("alert-warning")
+                $("#rawzonevalidationresult_content").html(xhr.responseText)
+            }
+        })
+    }
+
     events.push(function () {
         $("button[type=\"submit\"]").on("click", () => {
             $(this).button('loading')
@@ -744,6 +870,7 @@ include('foot.inc');
             alert("not implemented jet")
             //update_rrecord(data,dataOld)
         })
+
         $("button[value=\"delete_record\"]").on('click', function () {
             var $btn = $(this)
             $btn.button('loading')
@@ -758,6 +885,8 @@ include('foot.inc');
                     $btn.button('reset')
                 })
         })
+
+        $("#zone_data").on("change blur keyup", onRawZoneChanged)
 
         $("form").submit(function () {
             showWait("<?= gettext("Loading Zone Data...") ?>");

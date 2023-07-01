@@ -21,8 +21,8 @@
 
 global $shortcuts;
 
-$shortcuts['sxbind']				= [];
-$shortcuts['sxbind']['main']		= '/pkg_edit.php?xml=sxbind.xml';
+$shortcuts['sxbind']			= [];
+$shortcuts['sxbind']['main']	= '/pkg_edit.php?xml=sxbind.xml';
 $shortcuts['sxbind']['service']	= 'named';
 
 $shortcuts['sxbind_acls']		= $shortcuts['sxbind'];

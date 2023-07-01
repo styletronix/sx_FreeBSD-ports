@@ -147,6 +147,10 @@ namespace sxbind {
         public $PATH_RNDC_CONF;
         public $CMD_RNDC;
         public $PATH_DUMPFILE;
+
+        public $CHECKZONE_REQUIRED_PARAM = '-i none -k ignore -m ignore -M ignore -n ignore -S ignore -W ignore ';
+        public $CHECKZONE_DEFAULT_PARAM = '-i local ';
+
         /**
          * Summary of freeze_zone
          * @param mixed $zoneview  Zoneview
@@ -212,7 +216,7 @@ namespace sxbind {
         {
             global $config;
             // Replace all kind of linebreak styles with LF (unix style)
-            $data = preg_replace('~\R~u', "\n", $data) . "\n";
+            $data = self::normalize_zone_string($data);
             $dataexploded = explode("\n", $data);
 
             // parse zone data and increment serial
@@ -255,7 +259,7 @@ namespace sxbind {
             // validate and save to DB if successfull.
             // Defaut format text for master zones.
             // TODO: detect the zone format. text|raw|raw=|map
-            exec($this->PATH_CHECKZONE . ' -i none -k ignore -m ignore -M ignore -n ignore -S ignore -F text ' .
+            exec(escapeshellarg($this->PATH_CHECKZONE) . ' ' . $this->CHECKZONE_REQUIRED_PARAM .'-F text ' .
                 '-o ' . escapeshellarg($this->CHROOT_LOCALBASE . "/etc/namedb/{$zonetype}/{$view}/{$rzone}.DB") . ' ' .
                 escapeshellarg($zonename) . ' ' .
                 escapeshellarg($tempDB) . ' 2>&1', $output, $resultCode);
@@ -282,6 +286,59 @@ namespace sxbind {
                 'message' => implode("\n", $output),
                 'success' => ($resultCode == 0 ? true : false)
             ];
+        }
+        public static function normalize_zone_string(string $data){
+            // Replace all kind of linebreak styles with LF (unix style)
+            $data = preg_replace('~\R~u', "\n", $data);
+            
+            // Append single new line at end;
+            $data = trim($data);
+            $data .= "\n";
+
+            return $data;
+        }
+
+        public function validate_zone_string(string $data, $zonename ){
+            $result = [
+                "success" => false,
+                "has_warning" => false,
+                "has_error" => false,
+                "message" => ''
+            ];
+
+            $data = self::normalize_zone_string($data);
+            $zonename = rtrim($zonename, '.');
+            $tempDB = tempnam("/tmp", "validate_zone");
+
+            file_put_contents($tempDB, $data);
+
+            // Check WARNINGS with default settings
+            exec(escapeshellarg($this->PATH_CHECKZONE) . ' ' . $this->CHECKZONE_DEFAULT_PARAM .'-f text ' .
+                escapeshellarg($zonename) . ' ' .
+                escapeshellarg($tempDB) . ' 2>&1', $output, $resultCode);
+
+                if ($resultCode != 0){
+                    $result['has_warning'] = true;
+                    $result['message'] = 'Validated with the following warning:' . "\n" . implode("\n", $output);
+                }else{
+                    $result['message'] = 'Validation successfull:' . "\n" . implode("\n", $output);
+                }
+
+            // Check ERRORS with required data to load zone in BIND
+             exec(escapeshellarg($this->PATH_CHECKZONE) . ' ' . $this->CHECKZONE_REQUIRED_PARAM .'-f text ' .
+                escapeshellarg($zonename) . ' ' .
+                escapeshellarg($tempDB) . ' 2>&1', $output2, $resultCode2);
+                
+                if ($resultCode2 != 0){
+                    $result['has_error'] = true;
+                    $result['message'] = 'Validation failed: ' . "\n" . implode("\n", $output2);
+                }else{
+                    $result['success'] = true;
+                }
+            
+                unlink($tempDB);
+
+                return $result;
         }
 
         /**
@@ -1127,7 +1184,7 @@ namespace sxbind {
          * '_iscustomrecord' will be set to true for all records found in custom zone file. Otherwise '_iscustomrecord' is false or undefined.
          * @return array Returns array of zone records as it would be returned from parse_rndc_zone_dump().
          */
-        public   function get_zonerecords($include_customzonerecords = true)
+        public function get_zonerecords($include_customzonerecords = true)
         {
             global $config;
             $ret = [];

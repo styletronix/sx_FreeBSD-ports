@@ -15,6 +15,7 @@ www/shortcuts/pkg_sxbind.inc
 www/widgets/widgets/sxbind.widget.php
 www/sxbind_dump.php
 www/sxbind_keys.php
+www/sxbind_zone_config.php
 www/sxbind_zone_edit.php
 @dir /etc/inc/priv
 @dir /etc/inc
